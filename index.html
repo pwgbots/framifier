@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head id="doc-head">
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <title>diaFRAM</title>
+
+<!--
+diaFRAM is an executable graphical editor in support of the Functional
+Resonance Analysis Method developed originally by Erik Hollnagel.
+This tool is developed by Pieter Bots at Delft University of Technology.
+
+This HTML document (index.html) provides the browser-based GUI for
+editing and executing FRAM models. See the <head> section for required
+JavaScript files.
+
+NOTE: One of these files (iro.js) is authored by James Daniel. This
+scrip implements the elegant color picker that appears in some dialogs.
+
+The diaFRAM model editor is implemented in JavaScript and will work
+"stand-alone" in modern web browsers.
+-->
+
+<!--
+Copyright (c) 2024 Delft University of Technology
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+-->
+  <link rel="shortcut icon" type="image/png" href="images/icon.png">
+  <!-- NOTE: do not display the page until after software update check -->
+  <style>body { display: none; }</style>
+  <script>
+    // Create global variables
+    var
+      // Version number
+      DIAFRAM_VERSION = '0.1.0',
+      // GitHub repository
+      GITHUB_REPOSITORY = 'https://github.com/pwgbots/diafram',
+      // Create the XML parser
+      XML_PARSER = new DOMParser(),
+      // NOTE: global variables will be initialized when page has loaded
+      // The controller object (User Interface)
+      UI = null,
+      // The current model
+      MODEL = null,
+      // Manager objects that will act as controller and/or viewer
+      X_EDIT = null,
+      MONITOR = null,
+      FILE_MANAGER = null,
+      DOCUMENTATION_MANAGER = null,
+      // Stack for undo/redo operations
+      UNDO_STACK = null,
+      // The virtual machine
+      VM = null,
+    
+    // Load audio files
+      SOUNDS = {
+          notification: new Audio('sounds/notification.wav'),
+          warning: new Audio('sounds/warning.wav'),
+          error: new Audio('sounds/error.wav')
+        };
+      
+      
+    function loadDiaFRAM() {
+      // Ensures that the diaFRAM HTML and scripts will be the latest
+      // version by reloading unless URL contains current time stamp
+      // truncated to 10 s
+      const d = new Date(),
+            t = Math.floor(d.getTime() / 10000), // getTime returns milliseconds
+            url = window.location.href;
+      if(url.indexOf('?x=' + t) < 0) {
+        window.location.assign(url.split('?x=')[0] + '?x=' + t);
+      } else {
+        // Reload the style sheet
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'diafram.css?x=' + t;
+        link.media = 'all';
+        document.getElementById('doc-head').appendChild(link);
+        // Reload the scripts in their proper sequence, i.e., such that all
+        // classes are initialized before their instances are created
+        loadScripts(['-config', '-model', '-paper', '-controller',
+            '-monitor', '-expression-editor', '-file-manager',
+            '-model-autosaver', '-documentation-manager', 
+            '-finder', '-undo-redo', '-vm', '-utils'], t);
+      }
+    }
+
+    function loadScripts(sl, t) {
+      if(sl.length == 0) {
+        // Initialize only after all scripts have loaded
+        initializeDiaFRAM();
+      } else {
+        const
+            s = sl.shift(),
+            head = document.getElementById('doc-head'),
+            script = document.createElement('script');
+        // NOTE: recursive call after script s has loaded
+        script.onload = () => {
+            console.log('Loaded script: diafram' + s);
+            loadScripts(sl, t);
+          };
+        script.src= 'scripts/diafram' + s + '.js?x=' + t;
+        head.appendChild(script);
+      }
+    }
+    
+    function initializeDiaFRAM() {
+      // Protect user from unintentionally closing the browser
+      window.onbeforeunload = () => { return 'Exit diaFRAM?'; };
+      // NOTE: first create UI and Documentation Manager to report messages
+      UI = new GUIController();
+      UI.addListeners();
+      DOCUMENTATION_MANAGER = new DocumentationManager();
+      // Create the virtual machine
+      VM = new VirtualMachine();
+      // Create the GUI-only objects
+      UNDO_STACK = new UndoStack();
+      X_EDIT = new ExpressionEditor();
+      FINDER = new Finder();
+      // NOTE: Instantiate the GUI classes, not their superclasses
+      FILE_MANAGER = new GUIFileManager();
+      MONITOR = new GUIMonitor();
+      // Initialize auto-saving function
+      AUTO_SAVE = new ModelAutoSaver();
+      // Create a new diaFRAME model
+      UI.createNewModel();
+    }
+    
+  </script>
+  <script type="text/javascript" src="scripts/iro.min.js"></script>
+</head>
+<body onload="loadDiaFRAM();">
+  <!-- header shows top menu bar -->
+  <header>
+    <img id="static-icon" src="images/logo.png">
+    <div id="diafram-version-number"></div>
+    <div id="topbar">
+      <img id="new-btn" class="btn enab" src="images/new.png"
+           title="Create new model">
+      <img id="load-btn" class="btn enab" src="images/open.png"
+           title="Load model (Ctrl-L)">
+      <img id="settings-btn" class="btn enab" src="images/settings.png"
+           title="Change model settings (Alt-M)">
+      <img id="save-btn" class="btn enab" src="images/save.png"
+           title="Save model (Ctrl-S)">
+      <img id="finder-btn" class="btn enab" src="images/find.png"
+           title="Find model elements by their name (Ctrl-F)">
+      <img id="savediagram-btn" class="btn enab" src="images/save-diagram.png"
+           title="Download diagram as Scalable Vector Graphics (Ctrl-G)">
+      <img id="monitor-btn" class="btn enab" src="images/monitor.png"
+           title="View simulation monitor (Ctrl-M)">
+      <img id="documentation-btn" class="btn enab" src="images/info.png"
+           title="View information and documentation (Ctrl-I)">
+    </div>
+    <!-- if diagram is not the TOP activity, show a button to move up to its parent -->
+    <div id="focal-activity">
+      <div id="focal-name"></div>
+      <img id="parent-btn" class="btn enab" src="images/parent.png"
+           title="View parent activity (Ctrl-U)">
+      <img id="lift-btn" class="btn disab" src="images/lift.png"
+           title="Move selection to parent activity">
+    </div>
+    <!-- solver host image -->
+    <div id="server-host" style="float: right">
+      <img id="host-logo" src="images/tudelft.png"
+           title="This software is developed at Delft University of Technology">
+    </div>
+  </header>
+  <!-- the main window pane shows the diagram (SVG image) -->
+  <main>
+    <div id="cc">
+      <svg id="svg-root" version="1.1" xmlns="http://www.w3.org/2000/svg"
+           xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve">
+      </svg>
+    </div>
+  </main>
+  <!-- The footer displays the status bar with X/Y coordinates, zoom
+       in/out buttons, buttons for moving forward/backward in time, and
+       the status line that displays info, notifications, warnings, and
+       error messages. The set-up progress bar shows a growing colored
+       needle indicating progress of making Simplex tableau and input
+       file for the solver.
+   -->
+  <footer>
+    <div id="set-up-progress">
+      <div id="set-up-progress-bar"></div>
+    </div>
+    <table id="statusbar">
+      <tr>
+        <td id="pos-x">X = 0</td>
+        <td id="pos-y">Y = 0</td>
+        <td>
+          <img id="zoomout-btn" class="sbtn senab" src="images/zoom-out.png">
+        </td>
+        <td id="zoom">100%</td>
+        <td id="zoom-sep">
+          <img id="zoomin-btn" class="sbtn senab" src="images/zoom-in.png">
+        </td>
+        <td>
+          <img id="stepback-btn" class="sbtn senab" src="images/back.png">
+        </td>
+        <td id="step">1</td>
+        <td id="step-sep">
+          <img id="stepforward-btn" class="sbtn senab" src="images/forward.png">
+        </td>
+        <td id="issue-panel">
+          <span id="prev-issue">&#x25C1;</span>
+          <span id="issue-nr"></span>
+          <span id="next-issue">&#x25B7;</span>
+        </td>
+        <td id="info-line" title="Status bar"></td>
+        <td id="autosave-sep">
+          <img id="autosave-btn" class="btn enab" src="images/restore.png">
+        </td>
+        <td id="recall-btn"
+          title="To view previous messages, open the information dialog (Ctrl-I)
+and move the cursor over the status bar">
+        </td>
+      </tr>
+    </table>
+  </footer>
+  <!-- the side bar holds buttons for editing the model (ADD, DELETE, UNDO, REDO) and for running it -->
+  <div id="sidebar">
+    <img id="activity-btn" class="btn toggle enab" src="images/activity.png"
+         title="Add function">
+    <img id="note-btn" class="btn toggle enab sep" src="images/note.png"
+         title="Add note">
+    <img id="clone-btn" class="btn disab" src="images/clone.png"
+         title="Copy selection (Ctrl-C)">
+    <img id="paste-btn" class="btn disab sep" src="images/paste.png"
+         title="Paste selection (Ctrl-V)">
+    <img id="delete-btn" class="btn disab sep" src="images/delete.png"
+         title="Delete">
+    <img id="undo-btn" class="btn enab" src="images/undo.png"
+         title="Undo (Ctrl-Z)">
+    <img id="redo-btn" class="btn disab" src="images/redo.png"
+         title="Redo (Ctrl-Y)">
+    <img id="solve-btn" class="btn enab" src="images/solve.png"
+         title="Run simulation (Ctrl-R)">
+    <img id="stop-btn" class="btn enab off" src="images/stop.png"
+         title="Stop solving (Ctrl-Q)">
+    <img id="reset-btn" class="btn enab off" src="images/reset.png"
+         title="Reset model (Ctrl-K)">
+  </div>
+  
+  <!-- these hidden DIVs help to output create files to the browser as "attachments" (downloads) --> 
+  <a id="xml-saver" target='_blank' hidden="hidden"></a>
+  <a id="svg-saver" target='_blank' hidden="hidden"></a>
+
+  <!-- the following hidden DIVs are dialog windows that are shown as "modals",
+       i.e., disabling all other functions -->
+
+  <!-- the MODEL dialog prompts for (optional) model name and author name -->
+  <div id="model-modal" class="modal">
+    <div id="model-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        New model
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <table style="width: 100%">
+        <tr>
+          <td>Name:</td>
+          <td>
+            <input id="model-name" style="width: 219px"
+                   type="text" autocomplete="off">
+          </td>
+        </tr>
+        <tr>
+          <td>Author:</td>
+          <td>
+            <input id="model-author" style="width: 219px"
+                   type="text" autocomplete="off">
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- the LOAD dialog prompts the user for a diaFRAME model file on disk
+       to be loaded -->
+  <div id="load-modal" class="modal">
+    <div id="load-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        Load model
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <input id="load-xml-file" type="file">
+      <img id="load-autosaved-btn" class="btn enab" src="images/restore.png">
+    </div>
+  </div>
+    
+  <!-- the RESTORE dialog allows the user to restore an auto-saved model -->
+  <div id="restore-modal" class="modal">
+    <div id="restore-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        <span id="restore-dlg-title">Restore auto-saved model</span>
+        <img id="restore-cancel" class="cancel-btn" src="images/cancel.png">
+        <img id="restore-confirm" class="ok-btn" src="images/ok.png">
+      </div>
+      <div id="restore-scroll-area">
+        <table id="restore-table"></table>
+      </div>
+      <div id="auto-save-settings">
+        <label>Auto-save interval</label>
+        <input id="auto-save-minutes" type="text" autocomplete="off">
+        minutes <small>(0 = OFF)</small>
+        <label style="margin-left: 12px">Remove models after</label>
+        <input id="auto-save-hours" type="text" autocomplete="off">
+        hours
+        <img id="auto-save-clear-btn" class="btn enab" src="images/reset.png"
+             title="Remove all auto-saved models from user workspace">
+      </div>
+      <div id="confirm-remove-models">
+        Really remove all auto-saved models from user workspace?
+        <strong>
+        <img id="autosave-do-remove" class="inline-ok-btn"
+             src="images/ok.png"> Yes
+        <img id="autosave-cancel" class="inline-cancel-btn"
+             src="images/cancel.png"> No
+        </strong>
+      </div>
+    </div>
+  </div>
+  
+  <!-- the MODEL SETTINGS dialog allows the user to modify model parameters -->
+  <div id="settings-modal" class="modal">
+    <div id="settings-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        Model settings
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+        <img class="info-btn" src="images/info.png"
+             title="View/edit the documentation for this model">
+      </div>
+      <table style="width: 100%; white-space: nowrap">
+        <tr>
+          <td>Name:</td>
+          <td><input id="settings-name" type="text" autocomplete="off"
+                     style="width:270px"></td>
+        </tr>
+        <tr>
+          <td>Author:</td>
+          <td><input id="settings-author" type="text" autocomplete="off"
+                     style="width:270px"></td>
+        </tr>
+      <table style="width:100%; white-space: nowrap">
+        <tr>
+          <td style="padding:0px">
+            <div id="settings-block-arrows" class="box clear"></div>
+          </td>
+          <td style="padding-bottom:4px">Show hidden flows as block arrows</td>
+        </tr>
+        <tr>
+          <td style="padding:0px">
+            <div id="settings-align-to-grid" class="box clear"></div>
+          </td>
+          <td style="padding-bottom:4px">Snap to alignment grid with
+            <input id="settings-grid-pixels" type="text" autocomplete="off"
+                   style="width:35px;text-align:center"> pixels resolution
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- NOTE: the following hidden DIVs implement dialogs for the buttons on
+       the side bar -->
+
+  <!-- the ADD ACTIVITY dialog prompts only for the activity name and (optionally)
+       the name of the actor "owning" it -->
+  <div id="add-activity-modal" class="modal">
+    <div id="add-activity-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        <span id="add-activity-action">Add</span> function
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <table style="width: 100%">
+        <tr>
+          <td>Name:</td>
+          <td>
+            <input id="add-activity-name" style="width:223px" type="text"
+                   autocomplete="off">
+          </td>
+        </tr>
+        <tr>
+          <td>Agent:</td>
+          <td>
+            <input id="add-activity-actor" style="width:223px" type="text"
+                   autocomplete="off" placeholder="(optional)">
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- The NOTE dialog -- notes have no name as identifier => no input field
+       NOTE: this dialog is also used to *edit* an existing note
+   -->
+  <div id="note-modal" class="modal">
+    <div id="note-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        <span id="note-action">Add</span> note <span id="note-number"></span>
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <textarea id="note-text" autocomplete="off" autocorrect="off"
+                autocapitalize="off"></textarea>
+    </div>
+  </div>
+
+  <!-- The ADD ASPECT dialog allows adding an aspect to a link. -->
+  <div id="add-aspect-modal" class="modal">
+    <div id="add-aspect-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        Add aspect to scope of
+        <div id="add-aspect-from"></div>
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <div id="add-aspect-name-lbl">Name:</div>
+      <input id="add-aspect-name" type="text" autocomplete="off">
+      <select id="add-aspect-list"></select>
+      <img id="add-aspect-plus" src="images/add.png"
+           title="Define new system aspect">
+    </div>
+  </div>
+
+  <!-- The ASPECT dialog allows renaming an aspect and opening the
+       expression editor for its expression. -->
+  <div id="aspect-modal" class="modal">
+    <div id="aspect-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        Edit aspect <div id="aspect-lbl"></div>
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <input id="aspect-name" type="text" autocomplete="off">
+      <img id="aspect-x-btn" src="images/aspect.png" class="sbtn enab"
+           title="Edit equation for this aspect">
+    </div>
+  </div>
+
+  <!-- The CLONE dialog prompts for a prefix -->
+  <div id="clone-modal" class="modal">
+    <div id="clone-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        Clone selection <span id="clone-count"></span>
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <div style="font-size: 11px; margin: 2px">
+        Prefix + actor should result in unique new names
+        for selected activities and CORPITs.<br>
+        <em>CORPITs will NOT be cloned unless a prefix is specified.</em>
+      </div>
+      <table style="width: 100%">
+        <tr>
+          <td>Prefix:</td>
+          <td>
+            <input id="clone-prefix" type="text" autocomplete="off">
+          </td>
+        </tr>
+        <tr>
+          <td>Agent:</td>
+          <td>        
+            <input id="clone-actor" type="text" autocomplete="off">
+          </td>
+        </tr>
+      </table>
+      <div>
+        <div id="clone-renumbering" class="box clear"></div>
+        <div style="display:inline-block; vertical-align:top; margin-top:3px"
+             title="NOTE: This applies only to selected activities and CORPITs">
+          Use incremental numbering where possible
+        </div>
+      </div>
+    </div>
+  </div>  
+
+  <!-- The MOVE modal asks to confirm to move node to focal activity -->
+  <div id="move-modal" class="modal">
+    <div id="move-dlg" class="inp-dlg">
+      <div class="dlg-title" style="background-color: #cc88b0">
+        Confirm move
+      </div>
+      <div id="move-msg">
+        Really move function
+        <em><span id="move-activity-name"></span></em>
+        from function <strong><span id="move-from-parent"></span></strong>
+        to this function <strong><span id="move-to-parent"></span></strong>?
+      </div>
+      <div id="move-buttons">
+        <img class="ok-btn" src="images/ok.png">
+        Yes
+        <img class="cancel-btn" src="images/cancel.png">
+        No
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPRESSION EDITOR dialog -->
+  <div id="expression-modal" class="modal">
+    <div id="expression-dlg" class="inp-dlg">
+      <div class="dlg-title">Editing expression for
+        <div id="expression-property"></div>
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+        <img class="info-btn" src="images/info.png">
+      </div>
+      <div id="variable-bar">
+        <select id="variable-name"></select>
+        <button id="variable-insert">Insert</button>
+      </div>
+      <textarea id="expression-text" autocomplete="off" autocorrect="off"
+                autocapitalize="off" spellcheck="false"></textarea>
+      <div id="expression-status">&nbsp;</div>
+      <div id="expression-info">
+      </div>
+    </div>
+  </div>
+
+  <!-- the FINDER dialog allows searching for occurrence of entities -->
+  <div id="finder-dlg" class="inp-dlg">
+    <div id="finder-hdr" class="dragger dlg-title">
+      Find occurrences of entities <div id="finder-entity-imgs"></div>
+      <img id="finder-close-btn" class="close-btn" src="images/close.png">
+    </div>
+    <div id="finder-filter-bar">
+      <input id="finder-filter-text" type="text"
+             placeholder="(name filtering pattern)"
+             title="Pattern may contain logical & (AND), | (OR) and ^ (NOT)
+Limit search by starting with a type selector X?
+where X can be one or several of these letters: AFLS">
+    </div>
+    <div id="finder-scroll-area">
+      <table id="finder-table">
+      </table>
+    </div>
+    <div id="finder-status">
+      <span id="finder-count"></span> found
+    </div>
+    <div id="finder-separator"></div>
+    <div id="finder-item-header">(no item selected)</div>
+    <div id="finder-item-scroll-area">
+      <table id="finder-item-table">
+      </table>
+    </div>
+    <div id="finder-expression-hdr">No expressions</div>
+    <div id="finder-expression-scroll-area">
+      <table id="finder-expression-table">
+      </table>
+    </div>
+    <div id="finder-resize" class="resizer"></div>
+  </div>
+
+  <!-- the MONITOR dialog shows solver progress and messages, and model equations -->
+  <div id="monitor-dlg" class="inp-dlg">
+    <div id="monitor-hdr" class="dragger dlg-title">Solver monitor
+      <img id="monitor-close-btn" class="close-btn" src="images/close.png">
+    </div>
+    <div id="monitor-tabs" class="tabs">
+      <div id="monitor-msg-tab" class="tab sel-tab"
+           title="Any text output from the MILP solver">
+        Messages
+      </div>
+      <div id="monitor-vbl-tab" class="tab"
+           title="Legend to variables (numbers are column indices in Simplex tableau)">
+        Variables
+      </div>
+      <div id="monitor-eqs-tab" class="tab"
+           title="Equations of the MILP problem submitted to the solver">
+        Equations
+      </div>
+    </div>
+    <textarea id="monitor-msg" autocomplete="off" autocorrect="off"
+        autocapitalize="off" spellcheck="false" hidden="hidden"></textarea>
+    <textarea id="monitor-vbl" autocomplete="off" autocorrect="off"
+        autocapitalize="off" spellcheck="false" hidden="hidden"></textarea>
+    <textarea id="monitor-eqs" autocomplete="off" autocorrect="off"
+        autocapitalize="off" spellcheck="false" hidden="hidden"></textarea>
+    <div id="monitor-blocks">1/1</div>
+    <div id="monitor-timer">00:00</div>
+    <div id="monitor-progress">
+      <div id="monitor-progress-bar"></div>
+    </div>
+    <div id="monitor-resize" class="resizer"></div>
+  </div>
+  
+  <!-- the DOCUMENTATION dialog shows user comments and diaFRAME docu-items -->
+  <div id="documentation-dlg" class="inp-dlg">
+    <div id="documentation-hdr" class="dragger dlg-title">
+      <div id="docu-item-title">Documentation</div>
+      <img id="documentation-close-btn" class="close-btn" src="images/close.png">
+    </div>
+    <div id="docu-container">
+      <div id="docu-viewer"></div>
+      <textarea id="docu-editor" autocomplete="off" autocorrect="off"
+          autocapitalize="off" hidden="hidden"></textarea>
+    </div>
+    <img id="docu-edit-btn" class="btn disab" src="images/edit.png"
+         title="Edit">
+    <img id="docu-copy-btn" class="btn enab"  src="images/info-to-clpbrd.png"
+         title="Copy documentation to clipboard">
+    <img id="docu-model-info-btn" class="btn enab"  src="images/model-info.png"
+         title="Show all model documentation">
+    <img id="docu-save-btn" class="ok-btn" src="images/ok.png"
+         title="Save">
+    <img id="docu-cancel-btn" class="cancel-btn" src="images/cancel.png"
+         title="Cancel">
+    <img id="docu-info-btn" class="info-btn" src="images/info.png"
+         title="Markup conventions">
+    <img id="docu-resume-btn" class="close-btn" src="images/close.png"
+         title="Resume editing">
+    <div id="docu-message-hint">
+      <span style="font-style: normal">Shift</span>-move the cursor over the
+      diagram to view/edit annotations, or over the status bar to view messages 
+    </div>
+    <div id="documentation-resize" class="resizer"></div>
+  </div>
+  
+  <!-- the CALL STACK modal shows the VM's expression call stack
+       when an error has occurred -->
+  <div id="call-stack-modal" class="modal">
+    <div id="call-stack-dlg" class="inp-dlg">
+      <div class="dlg-title" style="background-color: #cc88b0">
+        <div id="call-stack-error"></div>
+        <img id="call-stack-close-btn" class="close-btn" src="images/close.png">
+      </div>
+      <div id="call-stack-table"></div>
+    </div>
+  </div>
+  
+  <!-- the PASTE dialog prompts for a prefix and parameter bindings -->
+  <div id="paste-modal" class="modal">
+    <div id="paste-dlg" class="inp-dlg">
+      <div class="dlg-title">
+        Name conflict resolution strategy
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <div id="paste-ftp" class="paste-option">
+        <div id="paste-ftp-box" class="box checked"></div>
+        <div class="paste-tactic">
+          Change <span id="paste-from-prefix"></span>&hellip;
+          to <span id="paste-to-prefix"></span>&hellip;
+        </div>
+      </div>
+      <div id="paste-fta" class="paste-option">
+        <div id="paste-fta-box" class="box checked"></div>
+        <div class="paste-tactic">
+          Change actor <span id="paste-from-actor"></span>
+          to <span id="paste-to-actor"></span>
+        </div>
+      </div>
+      <div class="paste-option">
+        <div id="paste-a-box" class="box checked"></div>
+        <div class="paste-tactic">
+          <label>If no actor, add:</label>
+          <input id="paste-actor" type="text"
+                 placeholder="(no actor)" autocomplete="off">
+        </div>
+      </div>
+      <div class="paste-option">
+        <div id="paste-p-box" class="box checked"></div>
+        <div class="paste-tactic">
+          <label>Add prefix:</label>
+          <input id="paste-prefix" type="text"
+                 placeholder="(none)" autocomplete="off">
+        </div>
+      </div>
+      <div class="paste-option">
+        <div id="paste-inc-box" class="box checked"></div>
+        <div class="paste-tactic">
+          Auto-increment tail number
+        </div>
+      </div>
+      <div id="paste-scroll-area">
+      </div>
+    </div>
+  </div>  
+
+</body>
+</html>
