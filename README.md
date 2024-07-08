@@ -15,6 +15,6 @@ its intuitive logic.
 
 The diaFRAM software is 100% HTML + CSS + Javascript. It should run in any modern browser.
 Installation is simple: copy files and folders to a directory on your computer while preserving
-the directory structure. The opening `index.html` in your browser should do the trick.
+the directory structure. Then opening `index.html` in your browser should do the trick.
 
 Feedback is welcome.
