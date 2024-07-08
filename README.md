@@ -9,8 +9,12 @@ of my Linny-R software to rapidly prototype a diagramming tool for FRAM -- hence
 I intend to develop it further so that it will perform a dynamic simulation that is
 consistent with the basic idea of FRAM.
 
-The leading principle for development is "functionality without fuss". I try to
+My leading principle for software development is "functionality without fuss". I try to
 minimize the number of elements of the graphical user interface, while maximizing
 its intuitive logic.
+
+The diaFRAM software is 100% HTML + CSS + Javascript. It should run in any modern browser.
+Installation is simple: copy files and folders to a directory on your computer while preserving
+the directory structure. The opening `index.html` in your browser should do the trick.
 
 Feedback is welcome.
