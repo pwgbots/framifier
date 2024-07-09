@@ -481,36 +481,6 @@ class DocumentationManager {
     }
   }
 
-  showHiddenIO(node, arrow) {
-    // Show list of products or processes linked to node by an invisible
-    // arrow (i.e., links represented by a block arrow).
-    let msg, iol;
-    if(arrow === UI.BLOCK_IN) {
-      iol = node.hidden_inputs;
-      msg = pluralS(iol.length, 'more input');
-    } else if(arrow === UI.BLOCK_OUT) {
-      iol = node.hidden_outputs;
-      msg = pluralS(iol.length, 'more output');
-    } else {
-      iol = node.hidden_io; 
-      msg = pluralS(iol.length, 'more double linkage');
-    }
-    msg = node.displayName + ' has ' + msg;
-    UI.on_block_arrow = true;
-    UI.setMessage(msg);
-    if(this.visible && !this.editing) {
-      // Set the dialog title.
-      this.title.innerHTML = msg;
-      // Show list.
-      const lis = [];
-      for(let i = 0; i < iol.length; i++) {
-        lis.push(`<li>${iol[i].displayName}</li>`);
-      }
-      lis.sort(ciCompare);
-      this.viewer.innerHTML = `<ul>${lis.join('')}</ul>`;
-    }
-  }
-
   showAllDocumentation() {
     // Show (as HTML) all model entities (categorized by type) with their
     // associated comments (if added by the modeler).

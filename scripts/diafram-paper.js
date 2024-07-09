@@ -186,38 +186,6 @@ class Shape {
     return el;
   }
   
-  addBlockArrow(x, y, io, n) {
-    // Add a colored block arrow with the number `n` in white IF n > 0
-    // NOTE: the ID of the owner of this shape (cluster, process or product)
-    // is passed as data attribute so that the SVG element "knows" for which
-    // entity the hidden flows must be displayed. The `io` data attribute
-    // indicates whether it concerns IN, OUT or IO flows.
-    if(n <= 0) return;
-    const
-        p = (io === UI.BLOCK_IO ?
-            ['M', x-4, ',', y-5, 'h8v-2l6,7l-6,7v-2h-8v2l-6,-7l6,-7z'] :
-            ['M', x-6, ',', y-5, 'h10v-2l6,7l-6,7v-2h-10z']),
-        a = this.addPath(p,
-            {'fill': UI.color.block_arrow, 'stroke': 'black',
-                'stroke-width': 0.4, 'stroke-linejoin': 'round',
-                'data-id': this.owner.identifier, 'data-io': io});
-    this.addText(x, y, n, {'fill': 'white'});
-    // Make SVG element responsive to cursor event.
-    a.setAttribute('pointer-events', 'auto');
-    a.addEventListener('mouseover',
-        (event) => {
-            const
-                el = event.target,
-                nb = MODEL.nodeBoxByID(el.dataset.id);
-            if(nb) {
-              DOCUMENTATION_MANAGER.showHiddenIO(nb,
-                  parseInt(el.dataset.io));
-            }
-          });
-    a.addEventListener('mouseout', () => { UI.on_block_arrow = false; });
-    return this.element;
-  }
-
   addConnector(x, y, l, id) {
     // Add a connector circle with the letter `l` 
     // NOTE: the ID of the owner of this shape (activity) is passed as
@@ -225,7 +193,7 @@ class Shape {
     // the aspect must be displayed. The `aspect` data attribute is also
     // set to the letter `l`.
     const c = this.addCircle(x, y, 7,
-        {fill: 'white', stroke: UI.color.node_rim, 'stroke-width': 0.75,
+        {fill: 'white', stroke: UI.color.rim, 'stroke-width': 0.75,
             'data-id': id, 'data-aspect': l});
     this.addText(x, y, l, {'fill': 'black', 'font-size': 7,
         'data-id': id, 'data-aspect': l});
@@ -261,11 +229,11 @@ class Paper {
     this.palette = {
       // Selected model elements are bright red
       select: '#ff0000',    
-      // Nodes (clusters, products and processes) have dark gray rim...
-      node_rim: '#606070',
+      // Activities have dark gray rim...
+      rim: '#606070',
       // ... and state-dependent fill colors
-      node_fill: '#ffffff',
-      src_snk: '#e0e0f0',
+      fg_fill: '#ffffff',
+      bg_fill: '#e0e0f0',
       // Font colors for entities
       actor_font: '#40a0e0', // medium blue
       // Process with level > 0 has a dark blue rim and production level font
@@ -326,7 +294,7 @@ class Paper {
     this.drag_rect = '__d_r_a_g__r_e_c_t__ID*';
     let id = 't_r_i_a_n_g_l_e__t_i_p__ID*';
     this.triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 8, this.palette.node_rim);
+    this.addMarker(defs, id, tri, 8, this.palette.rim);
     id = 'a_c_t_i_v_e__t_r_i_a_n_g_l_e__t_i_p__ID*';
     this.active_triangle = `url(#${id})`;
     this.addMarker(defs, id, tri, 8, this.palette.active_process);
@@ -350,7 +318,7 @@ class Paper {
     this.addMarker(defs, id, tri, 7.5, this.palette.at_process_ub_arrow);
     id = 'd_o_u_b_l_e__t_r_i_a_n_g_l_e__t_i_p__ID*';
     this.double_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 12, this.palette.node_rim);
+    this.addMarker(defs, id, tri, 12, this.palette.rim);
     id = 'a_c_t_i_v_e__d_b_l__t_r_i__t_i_p__ID*';
     this.active_double_triangle = `url(#${id})`;
     this.addMarker(defs, id, tri, 12, this.palette.active_process);
@@ -359,10 +327,10 @@ class Paper {
     this.addMarker(defs, id, tri, 12, 'silver');
     id = 'f_e_e_d_b_a_c_k__t_r_i_a_n_g_l_e__t_i_p__ID*';
     this.feedback_triangle = `url(#${id})`;
-    this.addMarker(defs, id, fbt, 10, this.palette.node_rim);
+    this.addMarker(defs, id, fbt, 10, this.palette.rim);
     id = 'c_h_e_v_r_o_n__t_i_p__ID*';
     this.chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 8, this.palette.node_rim);
+    this.addMarker(defs, id, chev, 8, this.palette.rim);
     id = 's_e_l_e_c_t_e_d__c_h_e_v_r_o_n__t_i_p__ID*';
     this.selected_chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 10, this.palette.select);
@@ -377,7 +345,7 @@ class Paper {
     this.addMarker(defs, id, chev, 6, 'black');
     id = 'o_p_e_n__w_e_d_g_e__t_i_p__ID*';
     this.open_wedge = `url(#${id})`;
-    this.addMarker(defs, id, wedge, 9, this.palette.node_rim);
+    this.addMarker(defs, id, wedge, 9, this.palette.rim);
     id = 's_e_l_e_c_t_e_d__o_p_e_n__w_e_d_g_e__t_i_p__ID*';
     this.selected_open_wedge = `url(#${id})`;
     this.addMarker(defs, id, wedge, 11, this.palette.select);
@@ -868,7 +836,6 @@ class Paper {
         fa = mdl.focal_activity,
         vl = fa.visibleLinks;
     for(let i = 0; i < fa.sub_activities.length; i++) {
-      fa.sub_activities[i].clearHiddenIO();
       this.drawActivity(fa.sub_activities[i]);
     }
     for(let i = 0; i < vl.length; i++) {
@@ -926,7 +893,7 @@ class Paper {
       chev = this.selected_chevron;
       ady = 4;
     } else {
-      stroke_color = this.palette.node_rim;
+      stroke_color = this.palette.rim;
       stroke_width = 1.25;
       chev = this.chevron;
       ady = 3;
@@ -935,20 +902,54 @@ class Paper {
         fa = l.from_activity,
         ta = l.to_activity,
         tc = l.to_connector,
-        angle = 'ORPITC'.indexOf(tc) * Math.PI / 3,
-        x1 = fa.x + fa.width * 0.55 + 7,
-        y1 = fa.y,
-        r = ta.width * 0.55 + 11,
-        x2 = ta.x + Math.cos(angle) * r,
-        y2 = ta.y + Math.sin(angle) * r,
-        // Control points should make the curve stand out, so use 25% of
-        // the Euclidean distance between the end points as "stretch".
-        ed = 10 + Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)) / 8,
-        // FROM control point should bend the curve around the FROM activity.
-        fcx = x1 + ed,
-        fcy = y1,
-        tcx = x2 + Math.cos(angle) * ed,
-        tcy = y2 + Math.sin(angle) * ed;
+        pi3 = Math.PI / 3,
+        angle = 'ORPITC'.indexOf(tc) * pi3,
+        hsr3 = Math.sqrt(3) / 2,
+        cx1 = fa.x + fa.width * 0.55,
+        cy1 = fa.y,
+        r = ta.width * 0.55,
+        cosa = Math.cos(angle),
+        sina = Math.sin(angle),
+        cx2 = ta.x + cosa * r,
+        cy2 = ta.y + sina * r,
+        dx = cx2 - cx1,
+        dy = cy2 - cy1,
+        dr = 10 + Math.sqrt(dx * dx + dy * dy) / 8;
+    // Declare variables for the arrow point coordinates.
+    let x1, y1, x2, y2, fcx, fcy, tcx, tcy;
+    // Control point for (O) connector follows the straight line to the
+    // other connector up to +/- 30 degrees.
+    const
+        fpm60 = Math.abs(dy) <= Math.abs(dx) / hsr3 * 0.5,
+        fcpa = (dx > 0 && fpm60 ? Math.atan(dy / dx) :
+            Math.sign(dy) * pi3 * 0.5),
+        fcpsin = Math.sin(fcpa),
+        fcpcos = Math.cos(fcpa); 
+    x1 = cx1 + 8 * fcpcos;
+    y1 = cy1 + 8 * fcpsin;
+    fcx = cx1 + dr * fcpcos;
+    // NOTE: Pull more up or down when TO lies left of FROM.
+    fcy = cy1 + dr * fcpsin + (dx < 0 ? Math.sign(dy) * (dr + 50) : 0);
+    // Likewise, the control point for the TO connector follows the
+    // straight line up to +/- 60 degrees of its default angle.
+    const
+        slatan = (dx ? Math.atan(-dy / dx) : Math.PI / 2),
+        slangle = (dx > 0 ? Math.PI - slatan :
+            (dy < 0 ? -slatan : 2 * Math.PI - slatan)),
+        da = angle - slangle,
+        to_i = tc === 'I',
+        part = (to_i && dx > 0 ? 0.5 : 1),
+        tpm60 = Math.abs(da) < pi3 * part,
+        rot = ('TC'.indexOf(tc) >= 0 ? -1 :  1),
+        tcpa = (tpm60 ? slangle :
+            angle + (to_i ? Math.sign(dy) * part : Math.sign(dx)) * pi3 * rot),
+        tcpsin = Math.sin(tcpa),
+        tcpcos = Math.cos(tcpa);
+console.log('HERE tpm60', tpm60, to_i);
+    x2 = cx2 + tcpcos * 11;
+    y2 = cy2 + tcpsin * 11;
+    tcx = cx2 + tcpcos * dr;
+    tcy = cy2 + tcpsin * dr + (to_i && dx < 0 ? dr + 50 : 0);
     // First draw a thick but near-transparent line so that the mouse
     // events is triggered sooner.
     const le = l.shape.addPath(
@@ -960,6 +961,8 @@ class Paper {
           () => { UI.setLinkUnderCursor(l); });
       le.addEventListener('mouseout',
           () => { UI.setLinkUnderCursor(null); });
+    l.shape.addCircle(fcx, fcy, 2, {fill: 'red'});
+    l.shape.addCircle(tcx, tcy, 2, {fill: 'blue'});
     // Then draw the line in its appropriate style.
     l.shape.addPath(
         [`M${x1},${y1}C${fcx},${fcy},${tcx},${tcy},${x2},${y2}`],
@@ -1038,8 +1041,9 @@ class Paper {
         hh = act.height / 2,
         qw = hw / 2;
     let stroke_width = 1,
-        stroke_color = this.palette.node_rim,
-        fill_color = this.palette.node_fill;
+        stroke_color = this.palette.rim,
+        fill_color = (act.isBackground ? this.palette.bg_fill :
+            this.palette.fg_fill);
     // Being selected overrules special border properties except SDA
     if(act.selected) {
       stroke_color = this.palette.select;
@@ -1078,13 +1082,6 @@ class Paper {
       act.shape.addText(x, cy + th + 6, act.actor.name,
           {'font-size': 10, fill: this.palette.actor_font,
               'font-style': 'italic'});
-    }
-    if(MODEL.show_block_arrows) {
-      // Add block arrows for hidden input and output links.
-      act.shape.addBlockArrow(x - hw + 3, y - hh + 17, UI.BLOCK_IN,
-          act.hidden_inputs.length);
-      act.shape.addBlockArrow(x + hw - 4, y - hh + 17, UI.BLOCK_OUT,
-          act.hidden_outputs.length);
     }
     // Highlight shape if needed.
     let filter = '';

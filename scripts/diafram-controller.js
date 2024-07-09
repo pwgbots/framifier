@@ -1281,7 +1281,7 @@ class GUIController {
     function connectorMouseOut() {
       // De-highlight connector unless it is the FROM-connector.
       if(con !== UI.from_connector) {
-        con.style.stroke = UI.color.node_rim;
+        con.style.stroke = UI.color.rim;
         con.style.strokeWidth = 0.75;
         con.style.fill = 'white';
       }
@@ -1345,14 +1345,14 @@ class GUIController {
           fc = UI.from_connector,
           tc = UI.to_connector;
       if(fc) {
-        fc.style.stroke = UI.color.node_rim;
+        fc.style.stroke = UI.color.rim;
         fc.style.strokeWidth = 0.75;
         fc.style.fill = 'white';
       }
       // Make connection if possible.
       if(tc) {
         // De-highlight the TO-connector. 
-        tc.style.stroke = UI.color.node_rim;
+        tc.style.stroke = UI.color.rim;
         tc.style.fill = 'white';
         tc.style.strokeWidth = 0.75;
         const l = MODEL.addLink(UI.from_activity, UI.to_activity,

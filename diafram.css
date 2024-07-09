@@ -1175,6 +1175,10 @@ div.menu-item:hover {
   border-top: 1px solid Silver;
 }
 
+#finder-table {
+  width: 100%;
+}
+
 img.finder {
   height: 14px;
   width: 14px;

@@ -210,7 +210,8 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
         vn = document.getElementById('variable-name'),
         options = [];
     // Add "empty" as first and initial option, but disable it.
-    options.push('<option selected disabled value="-1"></option>');
+    options.push('<option selected disabled value="-1" style="color: gray">' +
+        '(aspects in scope)</option>');
     for(let i = 0; i < n_list.length; i++) {
       options.push(`<option value="${i}">${n_list[i]}</option>`);
     }

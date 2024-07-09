@@ -1621,15 +1621,15 @@ class Activity extends NodeBox {
     super(parent, name, actor);
     this.sub_activities = [];
     this.aspects = [];
-    this.notes = [];
     this.connections = {C: [], O: [], R: [], P: [], I: [], T: [], S: []};
+    this.notes = [];
     this.predecessors = [];
-    this.hidden_inputs = [];
-    this.hidden_outputs = [];
-    this.hidden_io = [];
   }
   
   get type() {
+    // NOTE: The standard FRAM terminology does not speak of activities
+    // but of functions. Hence in all communication with the modeler,
+    // activities appear as "functions".
     return 'Function';
   }
 
@@ -1637,11 +1637,25 @@ class Activity extends NodeBox {
     return 'F';
   }
   
+  get isBackground() {
+    // Return TRUE when this activity does not have both incoming and
+    // outgoing links.
+    let n_in = 0,
+        n_out = 0;
+    for(let c in this.connections) if('CORPIT'.indexOf(c) >= 0) {
+      if(this.connections[c].length) {
+        if(c == 'O') {
+          n_out++;
+        } else {
+          n_in++;
+        }
+      }
+    }
+    return (!n_in || !n_out);
+  }
+  
   setPredecessors() {
     // Recursive function to create list of all nodes that precede this one.
-    // NOTE: As of version 2.0.0, feedback links are no longer displayed
-    // as such. To permit re-enabling this function, the functional part
-    // of this method has been commented out.
     for(let c in this.connections) if('CRPIT'.indexOf(c) >= 0) {
       for(let i = 0; i < this.connections[c].length; i++) {
         const l = this.connections[c][i];
@@ -1878,12 +1892,6 @@ class Activity extends NodeBox {
       const l = MODEL.links[k];
       if(l.from_activity === this || l.to_activity === this) UI.drawObject(l);
     }
-  }
-  
-  clearHiddenIO() {
-    this.hidden_inputs.length = 0;
-    this.hidden_outputs.length = 0;
-    this.hidden_io.length = 0;
   }
   
   copyPropertiesFrom(a) {
