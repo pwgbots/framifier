@@ -945,11 +945,10 @@ class Paper {
             angle + (to_i ? Math.sign(dy) * part : Math.sign(dx)) * pi3 * rot),
         tcpsin = Math.sin(tcpa),
         tcpcos = Math.cos(tcpa);
-console.log('HERE tpm60', tpm60, to_i);
     x2 = cx2 + tcpcos * 11;
     y2 = cy2 + tcpsin * 11;
     tcx = cx2 + tcpcos * dr;
-    tcy = cy2 + tcpsin * dr + (to_i && dx < 0 ? dr + 50 : 0);
+    tcy = cy2 + tcpsin * dr + (to_i && dx < 0 ? dr - Math.sign(dy) * 50 : 0);
     // First draw a thick but near-transparent line so that the mouse
     // events is triggered sooner.
     const le = l.shape.addPath(
@@ -961,8 +960,11 @@ console.log('HERE tpm60', tpm60, to_i);
           () => { UI.setLinkUnderCursor(l); });
       le.addEventListener('mouseout',
           () => { UI.setLinkUnderCursor(null); });
+/*
+    // Display control points (for testing & debugging).
     l.shape.addCircle(fcx, fcy, 2, {fill: 'red'});
     l.shape.addCircle(tcx, tcy, 2, {fill: 'blue'});
+*/
     // Then draw the line in its appropriate style.
     l.shape.addPath(
         [`M${x1},${y1}C${fcx},${fcy},${tcx},${tcy},${x2},${y2}`],
