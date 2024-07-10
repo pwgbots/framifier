@@ -1002,6 +1002,7 @@ img.inline-cancel-btn {
   width: calc(100% - 45px);
 }
 
+#sub-activities-list,
 #add-aspect-list,
 #expression-variables {
   position: absolute;
@@ -1016,12 +1017,14 @@ img.inline-cancel-btn {
   border-radius: 3px;
 }
 
+#sub-activities-list > table,
 #add-aspect-list > table,
 #expression-variables > table {
   width: 100%;
   border-collapse: collapse;
 }
 
+#sub-activities-list > table > tbody > tr > td,
 #add-aspect-list > table > tbody > tr > td,
 #expression-variables > table > tbody > tr > td {
   height: 16px;

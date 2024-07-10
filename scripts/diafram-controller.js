@@ -1334,39 +1334,90 @@ class GUIController {
       document.onmouseup = null;
       document.onmousemove = null;
       UI.updateCursorPosition(e);
-      // Hide dashed arrow.
-      UI.paper.hideDragLine();
-      // De-highlight the FROM connector (double-check that it exists).
-      const
-          fc = UI.from_connector,
-          tc = UI.to_connector;
-      if(fc) {
-        fc.style.stroke = UI.color.rim;
-        fc.style.strokeWidth = 0.75;
-        fc.style.fill = 'white';
+      if(UI.to_activity.sub_activities.length) {
+        // Prompt modeler to select specific activity to link to.
+        UI.promptForSubActivity();
+      } else {
+        UI.completeConnection(UI.to_activity);
       }
-      // Make connection if possible.
-      if(tc) {
-        // De-highlight the TO-connector. 
-        tc.style.stroke = UI.color.rim;
-        tc.style.fill = 'white';
-        tc.style.strokeWidth = 0.75;
-        const l = MODEL.addLink(UI.from_activity, UI.to_activity,
-            tc.dataset.aspect);
-        // NOTE: Draw link with both nodes, as they may change from
-        // background to foreground functions.
-        UI.drawObject(l.from_activity);
-        UI.drawObject(l.to_activity);
-        UI.drawObject(l);
-      }
-      // Terminate the connection process.
-      UI.from_connector = null;
-      UI.from_activity = null;
-      UI.to_connector = null;
-      UI.to_activity = null;
     }
   }
 
+  completeConnection(to_act) {
+    // Terminate the connection process. Only add the connection when
+    // `to_act` is not NULL. Otherwise, just clean up the view.
+    // Always hide dashed arrow.
+    this.paper.hideDragLine();
+    // De-highlight the FROM connector (double-check that it exists).
+    const
+        fc = this.from_connector,
+        tc = this.to_connector;
+    if(fc) {
+      fc.style.stroke = this.color.rim;
+      fc.style.strokeWidth = 0.75;
+      fc.style.fill = 'white';
+    }
+    // Make connection if possible.
+    if(tc) {
+      // De-highlight the TO-connector. 
+      tc.style.stroke = UI.color.rim;
+      tc.style.fill = 'white';
+      tc.style.strokeWidth = 0.75;
+      // Connect only when to_act is defined.
+      if(to_act) {
+        const l = MODEL.addLink(this.from_activity, to_act,
+            tc.dataset.aspect);
+        if(to_act === this.to_activity) {
+          // Normal connection between visible activities
+          // NOTE: Draw link with both nodes, as they may change from
+          // background to foreground functions.
+          this.drawObject(l.from_activity);
+          this.drawObject(l.to_activity);
+          this.drawObject(l);
+        } else {
+          // Connection with an invisible sub-activity.
+          UI.notify('Linking to ' + to_act.displayName);
+        }
+      }
+    }
+    // Terminate the connection process.
+    this.from_connector = null;
+    this.from_activity = null;
+    this.to_connector = null;
+    this.to_activity = null;
+  }
+
+  promptForSubActivity() {
+    // Display list of sub-activities to choose from.
+    // If none is selected (mouseout without click), no connection is made.
+    if(this.from_activity && this.to_activity) {
+      const
+          el = document.getElementById('sub-activities-list'),
+          ta = this.to_activity.sub_activities,
+          names = [],
+          html = [];
+      for(let i = 0; i < ta.length; i++) {
+        names.push(ta[i].displayName);
+      }
+      const suba = names.sort((a, b) => UI.compareFullNames(a, b));
+      for(let i = 0; i < suba.length; i++) {
+        const a =  this.nameToID(suba[i]);
+        html.push(`<tr class="list">` +
+            `<td onclick="UI.connectToSubActivity('${a}')">${suba[i]}</td></tr>`);
+      }
+      el.innerHTML = '<table>' + html.join('') + '</table>';
+      // Position the pop-up list.
+      el.style.bottom = '300px';
+      el.style.left = '300px';
+      el.style.display = 'block';
+    }
+  }
+  
+  connectToSubActivity(id) {
+    // Connect to the selected sub-activity, or abort if not recognized.
+    document.getElementById('sub-activities-list').style.display = 'none';
+    completeConnection(MODEL.nodeByID(id));
+  }
   
   
   //
