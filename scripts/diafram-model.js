@@ -40,7 +40,7 @@ class diaFRAMModel {
   }
 
   reset() { 
-    // Resets model properties to their default values
+    // Reset model properties to their default values.
     const d = new Date();
     this.time_created = d;
     this.last_modified = d;
@@ -58,20 +58,22 @@ class diaFRAMModel {
     this.actor_list = [];
     this.orphan_list = [];
     
-    // Model settings
+    // Model settings.
     this.grid_pixels = 20;
     this.align_to_grid = true;
     this.show_block_arrows = true;
     this.last_zoom_factor = 1;
     
-    // Diagram editor related properties
-    // t is the time step shown (t = 1 corresponds to start_period)
-    this.t = 1; 
+    // Diagram editor related properties.
+    this.selected_aspect = null;
+    this.selected_aspect_link = null;
     this.selection = [];
-    // Set the indicator that the model has not been solved yet
+    // Set the indicator that the model has not been executed yet.
     this.set_up = false;
     this.solved = false;
+    // t is the time step ("tick") shown.
     this.t = 1;
+    this.run_length = 100;
   }
   
   // NOTE: A model can also be the entity for the documentation manager,
@@ -375,7 +377,7 @@ class diaFRAMModel {
     return a;
   }
 
-  addAspect(name, activity=null, node=null) {
+  addAspect(name, link=null, node=null) {
     name = UI.cleanName(name);
     if(!UI.validName(name)) {
       UI.warningInvalidName(name);
@@ -383,19 +385,22 @@ class diaFRAMModel {
     }
     let nb = this.namedObjectByID(UI.nameToID(name));
     if(nb) {
-      // If activity by this name already exists, return it.
+      // If activity by this name already exists, add it to the link
+      // (if specified) and return it.
       if(nb instanceof Aspect) {
+        if(link) addDistinct(nb, link.aspects);
         return nb;
       }
       // Otherwise, warn the modeler.
       UI.warningEntityExists(nb);
       return null;
     }
-    const a = new Aspect(activity, name);
+    const a = new Aspect(name, link ? link.from_activity : null);
     if(node) a.initFromXML(node);
     a.setCode();
+    // Add aspect to link if specified.
+    if(link) addDistinct(a, link.aspects);
     this.aspects[a.identifier] = a;
-    if(activity) addDistinct(a, activity.aspects);
     a.resize();
     return a;
   }
@@ -465,8 +470,30 @@ class diaFRAMModel {
   //
   // Methods related to selection 
   //
+  
+  selectAspect(a, l) {
+    // Aspects are not added to the selection, as they can not be moved.
+    // Therefore, clear the selection.
+    this.clearSelection();
+    this.selected_aspect = a;
+    this.selected_aspect_link = l;
+    // NOTE: Redraw of link is needed to highlight because aspects do not
+    // have their own shape.
+    UI.drawObject(l);
+  }
+  
+  deselectAspect() {
+    const sa = this.selected_aspect;
+    if(!sa) return;
+    this.selected_aspect = null;
+    // NOTE: Redraw of link is needed to de-highlight because aspects do
+    // not have their own shape.
+    UI.drawObject(this.selected_aspect_link);
+    this.selected_aspect_link = null;
+  }
 
   select(obj) {
+    this.deselectAspect();
     obj.selected = true;
     if(this.selection.indexOf(obj) < 0) {
       this.selection.push(obj);
@@ -475,6 +502,7 @@ class diaFRAMModel {
   }
 
   deselect(obj) {
+    this.deselectAspect();
     obj.selected = false;
     let i = this.selection.indexOf(obj);
     if(i >= 0) {
@@ -519,6 +547,7 @@ class diaFRAMModel {
   }
 
   clearSelection(draw=true) {
+    this.deselectAspect();
     if(this.selection.length > 0) {
       for(let i = 0; i < this.selection.length; i++) {
         const obj = this.selection[i];
@@ -534,6 +563,7 @@ class diaFRAMModel {
     // NOTE: to be called after loading a model, and after UNDO/REDO (and
     // then before drawing the diagram)
     const fa = this.focal_activity;
+    this.deselectAspect();
     this.selection.length = 0;
     for(let i = 0; i < fa.sub_activities.length; i++) {
       if(fa.sub_activities[i].selected) {
@@ -838,7 +868,14 @@ class diaFRAMModel {
     // NOTE: This method implements the DELETE action, and hence should be
     // undoable. The UndoEdit is created by the calling routine; the methods
     // that actually delete model elements append their XML to the XML attribute
-    // of this UndoEdit  
+    // of this UndoEdit
+    // NOTE: When aspect is selected, this requires different action.
+    if(this.selected_aspect) {
+      this.selected_aspect.removeFromLink(this.selected_aspect_link);
+      this.selected_aspect = null;
+      this.selected_aspect_link = null;
+      return;
+    }
     let obj,
         fc = this.focal_activity;
     // Update the documentation manager (GUI only) if selection contains the
@@ -1040,6 +1077,8 @@ class diaFRAMModel {
         const c = n.childNodes[i];
         if(c.nodeName === 'aspect') {
           const name = xmlDecoded(nodeContentByTag(c, 'name'));
+          // NOTE: Aspects initially belong to no link. The link property
+          // will be set when initializing the links of this model.
           this.addAspect(name, null, c);
         }
       }
@@ -1175,7 +1214,7 @@ class diaFRAMModel {
     //     element 0.
     // (3) `other` specifies value for t = 1 and beyond if vector is
     //     static and has to to be initialized to a constant (typically 0).
-    v.length = this.runLength + 1;
+    v.length = this.run_length + 1;
     v.fill(other);
     v[0] = initial;
   }
@@ -1577,7 +1616,9 @@ class NodeBox extends ObjectWithXYWH {
 
 // CLASS Aspect
 class Aspect extends NodeBox {
-  constructor(activity, name) {
+  // The parent of an aspect is the activity (= function) to which it
+  // relates via some link.
+  constructor(name, activity=null) {
     super(activity, name, null);
     this.expression = new Expression(this, '');
   }
@@ -1612,6 +1653,26 @@ class Aspect extends NodeBox {
     this.expression.text = xmlDecoded(nodeContentByTag(node, 'expression'));
   }
   
+  removeFromLink(l) {
+    // Remove this aspect from its parent link, and also from the model
+    // if this link is the only one having this aspect.
+    // @@TO DO: prepare for undo!
+    if(!l) return;
+    const n = l.aspects.indexOf(this);
+    // Remove aspect from list.
+    if(n >= 0) l.aspects.splice(n, 1);
+    // NOTE: Aspect can only occur within its parent activity scope.
+    const ais = this.parent.aspectsInScope;
+    if(ais.indexOf(this) < 0) {
+      // No more occurrence => remove aspect from model.
+      const msg = `Aspect "${this.displayName}" removed from model`;
+      delete MODEL.aspects[this.identifier];
+      UI.notify(msg);
+    }
+    UI.drawObject(l);
+    UI.updateButtons();
+  }
+  
 } // END of CLASS Aspect
 
 
@@ -1620,7 +1681,6 @@ class Activity extends NodeBox {
   constructor(parent, name, actor) {
     super(parent, name, actor);
     this.sub_activities = [];
-    this.aspects = [];
     this.connections = {C: [], O: [], R: [], P: [], I: [], T: [], S: []};
     this.notes = [];
     this.predecessors = [];
@@ -1634,24 +1694,30 @@ class Activity extends NodeBox {
   }
 
   get typeLetter() {
+    // The F of "function" (see comment above).
     return 'F';
   }
   
-  get isBackground() {
-    // Return TRUE when this activity does not have both incoming and
-    // outgoing links.
-    let n_in = 0,
-        n_out = 0;
+  get countLinksInOut() {
+    // Return object with the number of incoming and outgoing links
+    // of this activity as properties.
+    const io = {incoming: 0, outgoing: 0};
     for(let c in this.connections) if('CORPIT'.indexOf(c) >= 0) {
-      if(this.connections[c].length) {
-        if(c == 'O') {
-          n_out++;
-        } else {
-          n_in++;
-        }
+      const n = this.connections[c].length;
+      if(c === 'O') {
+        io.outgoing += n;
+      } else {
+        io.incoming += n;
       }
     }
-    return (!n_in || !n_out);
+    return io;
+  }
+  
+  get isBackground() {
+    // Return TRUE when this activity does not have at least one incoming
+    // linc and at least one output link.
+    const l = this.countLinksInOut;
+    return !l.incoming || !l.outgoing;
   }
   
   setPredecessors() {
@@ -1717,11 +1783,7 @@ class Activity extends NodeBox {
     for(let i = 0; i < this.sub_activities.length; i++) {
       xml.push(`<activity-code>${this.sub_activities[i].code}</activity-code>`);
     }
-    xml.push('</sub-activities><aspects>');
-    for(let i = 0; i < this.aspects.length; i++) {
-      xml.push(`<aspect-code>${this.aspects[i].code}</aspect-code>`);
-    }
-    xml.push('</aspects><notes>');
+    xml.push('</sub-activities><notes>');
     for(let i = 0; i < this.notes.length; i++) {
       xml.push(this.notes[i].asXML);
     }
@@ -1752,16 +1814,6 @@ class Activity extends NodeBox {
         }
       }
     }
-    n = childNodeByTag(node, 'aspects');
-    if(n && n.childNodes) {
-      for(let i = 0; i < n.childNodes.length; i++) {
-        const c = n.childNodes[i];
-        if(c.nodeName === 'aspect-code') {
-          const a = MODEL.aspectByCode(nodeContent(c));
-          if(a) this.aspects.push(a);
-        }
-      }
-    }
     n = childNodeByTag(node, 'notes');
     if(n && n.childNodes) {
       for(let i = 0; i < n.childNodes.length; i++) {
@@ -1789,6 +1841,23 @@ class Activity extends NodeBox {
     }
   }
   
+  get aspectsInScope() {
+    // Return list of all aspects that are related to this activity.
+    // NOTE: Output aspects can be used to compute other output aspects
+    // of the same function; the VM will report circularity problems.
+    let ais = [];
+    for(let c in this.connections) if('CORPIT'.indexOf(c) >= 0) {
+      const cc = this.connections[c];
+      for(let i = 0; i < cc.length; i++) {
+        const la = cc[i].aspects;
+        for(let j = 0; j < la.length; j++) {
+          addDistinct(la[j], ais);
+        }
+      }
+    }
+    return ais;
+  }
+
   containsActivity(a) {
     // Return the subactivity of this activity that contains activity `a`,
     // or NULL.
@@ -1808,27 +1877,6 @@ class Activity extends NodeBox {
       sa = sa.concat(this.sub_activities[i].allActivities); // recursion!
     }
     return sa;
-  }
-
-  get allAspects() {
-    // Return list of all aspects of this activity and its subactivities.
-    let aa = this.aspects.slice();
-    for(let i = 0; i < this.sub_activities.length; i++) {
-      aa = aa.concat(this.sub_activities[i].allAspects); // recursion!
-    }
-    return aa;
-  }
-  
-  get aspectsInScope() {
-    // Return list of all aspects that are linked into in this activity.
-    let ais = this.aspects.slice();
-    for(let c in this.connections) if('CRPIT'.indexOf(c) >= 0) {
-      for(let i = 0; i < this.connections[c].length; i++) {
-        const l = this.connections[c][i];
-        ais = ais.concat(l.aspects);
-      }
-    }
-    return ais;
   }
 
   get relatedLinks() {
@@ -1854,6 +1902,31 @@ class Activity extends NodeBox {
       }
     }
     return vl;
+  }
+  
+  deepLinks(a) {
+    // Return a lookup-object of all links that connect some sub-activity
+    // of the parent of this activity with activity `a` or any of its
+    // sub-activities. The lookup-object categorizes links by their
+    // connector.
+    const dl = {C: [], O: [], R: [], P: [], I: [], T: []};
+    if(!a.parent) return dl;
+    const
+        sa = a.parent.sub_activities,
+        aa = a.allActivities;
+    aa.push(a);
+    for(let k in MODEL.links) if(MODEL.hasOwnProperty(k)) {
+      const
+          l = MODEL.links(k),
+          fa = l.from_activity,
+          ta = l.to_activity;
+      if(sa.indexOf(ta) >= 0) {
+        dl.O.push(l);
+      } else if(sa.indexOf(fa) >= 0) {
+        dl[l.connector].push(l);
+      }
+    }
+    return dl;
   }
 
   containsLink(l) {
@@ -2003,8 +2076,12 @@ class Link {
               ac = nodeContent(c),
               a = MODEL.aspectByCode(ac);
           if(a) {
-            // NOTE: The FROM activity is the "parent" of this aspect.
+            // The FROM node of the link being initialized is the "parent"
+            // of its aspects.
             a.parent = this.from_activity;
+            // NOTE: Aspects are recorded as model entities, and only
+            // *referenced* by links (so the same aspect can appear
+            // on multiple links).
             this.aspects.push(a);
           } else {
             console.log('ERROR: Faild to add aspect', ac, 'to link',

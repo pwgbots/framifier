@@ -32,17 +32,19 @@ SOFTWARE.
 // CLASS ExpressionEditor
 class ExpressionEditor {
   constructor() {
-    this.edited_input_id = '';
+    this.edited_object = null;
     this.edited_expression = null;
     // Dialog DOM elements.
-    this.property = document.getElementById('expression-property');
-    this.text = document.getElementById('expression-text');
-    this.status = document.getElementById('expression-status');
-    this.info = document.getElementById('expression-info');
-    // The DOM elements for the "insert variable" bar.
-    this.name = document.getElementById('variable-name');
+    const md = UI.modals.expression;
+    this.scope = md.element('scope');
+    this.aspect = md.element('aspect');
+    this.text = md.element('text');
+    this.status = md.element('status');
+    this.help = md.element('help');
+    this.insert = md.element('insert');
+    this.variables = md.element('variables');
     // The quick guide to diaFRAM expressions.
-    this.info.innerHTML = `
+    this.help.innerHTML = `
 <h3>diaFRAM expressions</h3>
 <p><em>NOTE: Move cursor over a</em> <code>symbol</code>
   <em>for explanation.</em>
@@ -132,37 +134,65 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
   Use parentheses to override the default evaluation precedence.
 </p>`;
     // Add listeners to the GUI elements.
-    const md = UI.modals.expression;
     md.ok.addEventListener('click', () => X_EDIT.parseExpression());
     md.cancel.addEventListener('click', () => X_EDIT.cancel());
     // NOTE: This modal also has an information button in its header.
     md.info.addEventListener(
         'click', () => X_EDIT.toggleExpressionInfo());
-    document.getElementById('variable-insert').addEventListener(
-        'click', () => X_EDIT.insertVariable());
+    // The "insert aspect" button shows variables within scope (if any).
+    this.insert.addEventListener(
+        'mouseover', () => X_EDIT.showVariables());
+    // List with variables in scope disappears when cursor moves out.
+    this.variables.addEventListener(
+        'mouseout', () => X_EDIT.hideVariables());
+    // Ensure that list disappears when cursor moves into other controls.
+    this.text.addEventListener(
+        'mouseover', () => X_EDIT.hideVariables());
+    this.status.addEventListener(
+        'mouseover', () => X_EDIT.hideVariables());
   }
 
   editExpression(asp) {
     // Open the dialog for the expression for aspect `asp`.
     this.edited_object = asp;
     this.edited_expression = asp.expression;
-    const md = UI.modals.expression;
+    this.activity_scope = asp.parent;
+    this.scope.innerHTML = `(<em>scope:</em> ${this.activity_scope.displayName})`;
+    this.aspect.value = asp.displayName;
     this.text.value = this.edited_expression.text.trim();
-    this.updateVariableBar();
+    this.updateVariables();
     this.clearStatusBar();
-    md.show('text');
+    UI.modals.expression.show('text');
   }
  
   cancel() {
     // Close the expression editor dialog.
-    UI.modals.expression.hide();
-    // CLear other properties that relate to the edited expression.
-    this.edited_input_id = '';
     this.edited_expression = null;
+    UI.edited_object = null;
+    UI.modals.expression.hide();
   }
-  
+
   parseExpression() {
-    // Parse the contents of the expression editor.
+    // NOTE: The name of the edited aspect may have been changed.
+    // @@TO DO: prepare for undo
+    const
+        md = UI.modals.expression,
+        asp = this.edited_object;
+    // Rename object if name has changed.
+    let nn = md.element('aspect').value.trim(),
+        nasp = asp.rename(nn);
+    // NOTE: When rename returns FALSE, a warning is already shown.
+    if(nasp !== true && nasp !== false) {
+      this.warningEntityExists(nasp);
+      return false;
+    }
+    // Rename was successful => diagram must be updated.
+    let l = MODEL.linksWithAspect(asp);
+    for(let i = 0; i < l.length; i++) {
+      // Redraw the shape, as its appearance may have changed.
+      UI.paper.drawLink(l[i]);
+    }
+    // Only now parse the contents of the expression editor.
     let xt = this.text.value.trim();
     // Remove all non-functional whitespace from variable references. 
     xt = monoSpacedVariables(xt);
@@ -181,6 +211,7 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
     } else {
       this.edited_expression.text = xp.expr;
       UI.modals.expression.hide();
+      UI.edited_object = false;
       return true;
     }
   }
@@ -192,10 +223,10 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
   
   get aspectNames() {
     // Returns a list of names of all defined aspects.
-    // NOTE: `edited_object` is an aspect on a link => parent is the
-    // activty that calculates this aspect.
+    // NOTE: `edited_object` is an aspect on a link => parent is that
+    // link, and FROM activty of that link defines the scope.
     const
-        ais = this.edited_object.parent.aspectsInScope,
+        ais = this.activity_scope.aspectsInScope,
         list = [];
     for(let i = 0; i < ais.length; i++) {
       list.push(ais[i].displayName);
@@ -203,33 +234,57 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
     return list;
   }  
   
-  updateVariableBar() {
-    const
-        n_list = this.aspectNames.sort(
-            (a, b) => UI.compareFullNames(a, b)),
-        vn = document.getElementById('variable-name'),
-        options = [];
-    // Add "empty" as first and initial option, but disable it.
-    options.push('<option selected disabled value="-1" style="color: gray">' +
-        '(aspects in scope)</option>');
-    for(let i = 0; i < n_list.length; i++) {
-      options.push(`<option value="${i}">${n_list[i]}</option>`);
+  updateVariables() {
+    // Compile list of variables in scope.
+      const
+        tbl = this.variables,
+        html = [],
+        vis = this.aspectNames.sort(
+            (a, b) => UI.compareFullNames(a, b));
+    this.variables_in_scope = vis;
+    for(let i = 0; i < vis.length; i++) {
+      html.push(`<tr class="list">
+          <td onclick="X_EDIT.insertVariable(${i})">${vis[i]}</td>
+        </tr>`);
     }
-    vn.innerHTML = options.join('');
-    vn.value = -1;
-    vn.style.display = 'inline-block';
+    tbl.innerHTML = '<table>' + html.join('') + '</table>';
+    if(vis.length) {
+      this.insert.classList.remove('disab');
+      this.insert.classList.add('enab');
+    } else {
+      this.insert.classList.remove('enab');
+      this.insert.classList.add('disab');
+    }
+    this.insert.title = pluralS(vis.length, 'variable') +
+        ` within scope of function "${this.activity_scope.displayName}"`;
+    // Initially hide the variable list.
+    this.variables.style.display = 'none';
   }
   
-  insertVariable() {
-    const n = this.name.options[this.name.selectedIndex].text;
-    if(n) {
+  showVariables() {
+    this.variables.style.display = 'block';
+  }
+  
+  hideVariables() {
+    const e = event || window.event;
+    e.preventDefault();
+    e.stopPropagation();
+    // Only hide when the mouse leaves the complete list.
+    if(e.target.nodeName === 'DIV') this.variables.style.display = 'none';    
+  }
+  
+  insertVariable(nr) {
+    // Hide variable list and insert name of selected variable.
+    this.variables.style.display = 'none';
+    const name = this.variables_in_scope[nr];
+    if(name) {
       let p = this.text.selectionStart;
       const
           v = this.text.value,
           tb = v.substring(0, p),
           ta = v.substring(p, v.length);
-      this.text.value = `${tb}[${n}]${ta}`;
-      p += n.length + 2;
+      this.text.value = `${tb}[${name}]${ta}`;
+      p += name.length + 2;
       this.text.setSelectionRange(p, p);
     }
     this.text.focus();
@@ -240,13 +295,13 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
     // meanwhile changing the dialog buttons: when guide is showing, only
     // display a "close" button, otherwise info, OK and cancel
     const md = UI.modals.expression;
-    if(window.getComputedStyle(this.info).display !== 'none') {
-      this.info.style.display = 'none';
+    if(window.getComputedStyle(this.help).display !== 'none') {
+      this.help.style.display = 'none';
       md.ok.style.display = 'block';
       md.cancel.style.display = 'block';
       md.info.src = 'images/info.png';
     } else {
-      this.info.style.display = 'block';
+      this.help.style.display = 'block';
       md.ok.style.display = 'none';
       md.cancel.style.display = 'none';
       md.info.src = 'images/close.png';

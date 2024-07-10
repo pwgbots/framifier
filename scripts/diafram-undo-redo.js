@@ -43,6 +43,8 @@ class UndoEdit {
     this.properties = [];
     // Undo may involve restoring the `selected` property of selected items.
     this.selection = [];
+    this.selected_aspect = null;
+    this.selected_aspect_link = null;
     this.xml = '';
   }
   
@@ -73,6 +75,8 @@ class UndoEdit {
     for(let i = 0; i < MODEL.selection.length; i++) {
       this.selection.push(MODEL.selection[i].identifier);
     }
+    this.selected_aspect = MODEL.selected_aspect;
+    this.selected_aspect_link = MODEL.selected_aspect_link;
   }
   
   get getSelection() {
@@ -234,6 +238,8 @@ class UndoStack {
       MODEL.translateGraph(tdx, tdy);
       // Restore the selection as it was at the time of the "move" action
       MODEL.selectList(ue.getSelection);
+      MODEL.selected_aspect = ue.selected_aspect;
+      MODEL.selected_aspect_link = ue.selected_aspect_link;
       // Move the selection back to its original position
       MODEL.moveSelection(dx - tdx, dy - tdy);
     }

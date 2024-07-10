@@ -149,10 +149,6 @@ class GUIController {
     this.version_div.innerHTML = 'Version ' + this.version_number;
     // Initialize the "paper" for drawing the model diagram.
     this.paper = new Paper();
-    // Block arrows on nodes come in three types:
-    this.BLOCK_IN = 1;
-    this.BLOCK_OUT = 2;
-    this.BLOCK_IO = 3;
     // The properties below are used to avoid too frequent redrawing of
     // the SVG model diagram.
     this.busy_drawing = false;
@@ -178,7 +174,6 @@ class GUIController {
     this.on_aspect = null;
     this.on_activity = null;
     this.on_note = null;
-    this.on_block_arrow = null;
     this.dragged_node = null;
     this.activity_to_move = null;
     this.dbl_clicked_activity = null;
@@ -240,7 +235,7 @@ class GUIController {
 
     // Initialize "main" modals, i.e., those that relate to the controller,
     // not to other dialog objects.
-    const main_modals = ['model', 'load', 'settings', 'aspect',
+    const main_modals = ['model', 'load', 'settings',
         'add-activity', 'add-aspect', 'move', 'note', 'clone', 'expression'];
     for(let i = 0; i < main_modals.length; i++) {
       this.modals[main_modals[i]] = new ModalDialog(main_modals[i]);
@@ -504,7 +499,6 @@ class GUIController {
     return pan1.length - pan2.length;
   }
 
-  
   nameToID(name) {
     // Return a name in lower case with link arrow replaced by three
     // underscores, and spaces converted to underscores; in this way,
@@ -743,16 +737,17 @@ class GUIController {
         () => UI.addAspect());
     this.modals['add-aspect'].cancel.addEventListener('click',
         () => UI.modals['add-aspect'].hide());
-    this.modals['add-aspect'].element('plus').addEventListener('click',
-        () => UI.toggleSelectAspectButton());
-
-    // ASPECT modal appears when an aspect on a link is double-clicked.
-    this.modals.aspect.ok.addEventListener('click',
-        () => UI.updateAspectProperties());
-    this.modals.aspect.cancel.addEventListener('click',
-        () => UI.cancelEditAspect());
-    this.modals.aspect.element('x-btn').addEventListener('click',
-        () => UI.editAspectExpression());
+    // The "insert aspect" button shows aspects within scope (if any).
+    document.getElementById('add-aspect-insert').addEventListener(
+        'mouseover', () => UI.showAspectList());
+    // List with variables in scope disappears when cursor moves out.
+    document.getElementById('add-aspect-list').addEventListener(
+        'mouseout', () => UI.hideAspectList());
+    // Ensure that list disappears when cursor moves into other controls.
+    document.getElementById('add-aspect-modal').addEventListener(
+        'mouseover', () => UI.hideAspectList());
+    document.getElementById('add-aspect-name').addEventListener(
+        'mouseover', () => UI.hideAspectList());
 
     // The MOVE dialog can appear when an activity is added.
     this.modals.move.ok.addEventListener('click',
@@ -798,11 +793,13 @@ class GUIController {
       t = t.parentElement;
     }
     this.aspect_under_cursor = MODEL.objectByID(t.dataset.id);
+    this.aspect_link_under_cursor = MODEL.objectByID(t.dataset.linkid);
   }
   
   clearAspectUnderCursor() {
     // Clears aspect under cursor.
     this.aspect_under_cursor = null;
+    this.aspect_link_under_cursor = null;
   }
   
   updateControllerDialogs(letters) {
@@ -929,7 +926,6 @@ class GUIController {
     this.on_link = null;
     this.on_aspect = null;
     this.on_note = null;
-    this.on_block_arrow = false;
     this.dragged_node = null;
     this.target_activity = null;
     this.linking_aspect = null;
@@ -1357,7 +1353,11 @@ class GUIController {
         tc.style.strokeWidth = 0.75;
         const l = MODEL.addLink(UI.from_activity, UI.to_activity,
             tc.dataset.aspect);
-        UI.paper.drawLink(l);
+        // NOTE: Draw link with both nodes, as they may change from
+        // background to foreground functions.
+        UI.drawObject(l.from_activity);
+        UI.drawObject(l.to_activity);
+        UI.drawObject(l);
       }
       // Terminate the connection process.
       UI.from_connector = null;
@@ -1415,9 +1415,8 @@ class GUIController {
     this.enableButtons(node_btns + model_btns);
     this.active_button = this.stayActiveButton;
     this.disableButtons(edit_btns);
-    if(MODEL.selection.length > 0) {
-      this.enableButtons('clone delete');
-    }
+    if(MODEL.selected_aspect) this.enableButtons('delete');
+    if(MODEL.selection.length > 0) this.enableButtons('clone delete');
     if(this.canPaste) this.enableButtons('paste');
     // Only allow solving when events can occur.
     if(MODEL.hasTargets) this.enableButtons('solve');
@@ -1521,6 +1520,7 @@ class GUIController {
     // First check aspects, as these lie on top of links.
     if(this.aspect_under_cursor) {
       this.on_aspect = this.aspect_under_cursor;
+      this.on_aspect_link = this.aspect_link_under_cursor;
     } else if(fa.relatedLinks.indexOf(this.link_under_cursor) >= 0) {
       this.on_link = this.link_under_cursor;
     }
@@ -1555,11 +1555,16 @@ class GUIController {
     // indicate that selected activities will be moved into the target.
     if(this.dragged_node) {
       if(this.on_activity) {
-        cr = 'cell';
-        this.target_activity = this.on_activity;
-        // Redraw the target activity so it will appear on top (and
-        // highlighted).
-        UI.paper.drawActivity(this.target_activity);
+        const io = this.on_activity.countLinksInOut;
+        if(io.incoming || io.outgoing) {
+          cr = 'not-allowed';
+        } else {
+          cr = 'cell';
+          this.target_activity = this.on_activity;
+          // Redraw the target activity so it will appear on top (and
+          // highlighted).
+          UI.paper.drawActivity(this.target_activity);
+        }
       } else {
         cr = 'grab';
       }
@@ -1608,6 +1613,7 @@ class GUIController {
         }
         UI.drawDiagram(MODEL);
       }
+      MODEL.deselectAspect();
       this.updateButtons();
       return;
     } // END IF Ctrl
@@ -1646,13 +1652,14 @@ class GUIController {
       }
       return;
     }
-  
     // ALT key pressed => open properties dialog if cursor hovers over
     // some element.
     if(e.altKey) {
       // NOTE: First check links -- see mouseMove() for motivation.
       if(this.on_link) {
         this.showAddAspectDialog(this.on_link);
+      } else if(this.on_aspect) {
+        this.showAspectPropertiesDialog(this.on_aspect);
       } else if(this.on_activity) {
         this.showActivityPropertiesDialog(this.on_activity);
       } else if(this.on_note) {
@@ -1661,6 +1668,8 @@ class GUIController {
     // NOTE: First check links -- see mouseMove() for motivation.
     } else if(this.on_link) {
       MODEL.select(this.on_link);
+    } else if(this.on_aspect) {
+      MODEL.selectAspect(this.on_aspect, this.on_aspect_link);
     } else if(this.on_note) {
       this.dragged_node = this.on_note;
       this.move_dx = this.mouse_x - this.on_note.x;
@@ -1669,16 +1678,18 @@ class GUIController {
       UNDO_STACK.push('move', this.dragged_node, true);
     // Cursor on activity => start moving.
     } else if(this.on_activity) {
+      MODEL.deselectAspect();
       this.dragged_node = this.on_activity;
       this.move_dx = this.mouse_x - this.on_activity.x;
       this.move_dy = this.mouse_y - this.on_activity.y;
+      // NOTE: Do not select when already in selection.
       if(MODEL.selection.indexOf(this.on_activity) < 0) {
         MODEL.select(this.on_activity);
       }
       // Pass dragged activity for UNDO.
       UNDO_STACK.push('move', this.dragged_node, true);
-    } else if(!this.on_aspect) {
-      // Do not start rectangle selection when on an aspect. 
+    } else { 
+      MODEL.deselectAspect();
       this.start_sel_x = this.mouse_x;
       this.start_sel_y = this.mouse_y;
     }
@@ -1745,17 +1756,26 @@ class GUIController {
       this.paper.container.style.cursor = 'pointer';
       // NOTE: Cursor will always be over the selected activity
       // (while dragging).
+      
+      // NOTE: do not permit dropping a selection into an activity that
+      // has own inputs or outputs. Drop targets must be mere containers
+      // for subactivities.
       if(this.on_activity && !this.on_activity.selected) {
-        UNDO_STACK.push('drop', this.on_activity);
-        MODEL.dropSelectionIntoActivity(this.on_activity);
-        // Redraw activity to erase its orange "target corona".
-        // NOTE: This means that the target must be set to NULL first.
-        this.target_activity = null;
-        UI.paper.drawActivity(this.on_activity);
-        // Reset the rest as well.
-        this.on_activity = null;
-        this.on_note = null;
-        this.dragged_node = null;
+        const io = this.on_activity.countLinksInOut;
+        if(io.incoming || io.outgoing) {
+          this.paper.container.style.cursor = 'not-allowed';
+        } else {
+          UNDO_STACK.push('drop', this.on_activity);
+          MODEL.dropSelectionIntoActivity(this.on_activity);
+          // Redraw activity to erase its orange "target corona".
+          // NOTE: This means that the target must be set to NULL first.
+          this.target_activity = null;
+          UI.paper.drawActivity(this.on_activity);
+          // Reset the rest as well.
+          this.on_activity = null;
+          this.on_note = null;
+          this.dragged_node = null;
+        }
       }
   
       // Check wether the cursor has been moved.
@@ -1785,7 +1805,7 @@ class GUIController {
       if(this.on_link && (e.altKey || d_click)) {
         this.showAddAspectDialog(this.on_link);
       } else if(this.on_aspect && (e.altKey || d_click)) {
-        this.showAspectPropertiesDialog(this.on_aspect);
+        this.showAspectPropertiesDialog(this.on_aspect, this.on_aspect_link);
       }
     }
     this.start_sel_x = -1;
@@ -2922,64 +2942,67 @@ console.log('HERE name conflicts', name_conflicts, mapping);
 
   // Add aspect modal
 
-  showAddAspectDialog(l) {
+  showAspectList() {
+    document.getElementById('add-aspect-list').style.display = 'block';
+  }
+  
+  insertAspectName(n) {
+    document.getElementById('add-aspect-name').value = n;
+    document.getElementById('add-aspect-list').style.display = 'none';
+  }
+
+  hideAspectList() {
+    const e = event || window.event;
+    e.preventDefault();
+    e.stopPropagation();
+    // Only hide when the mouse leaves the complete list.
+    if(e.target.nodeName === 'DIV') {
+      document.getElementById('add-aspect-list').style.display = 'none';
+    }
+  }
+  
+  showAddAspectDialog(link) {
     const
         md = this.modals['add-aspect'],
-        fa = l.from_activity,
-        aa = fa.aspectsInScope,
-        options = [],
+        fa = link.from_activity,
+        ais = fa.aspectsInScope,
+        list = [],
         ne = md.element('name'),
         le = md.element('list'),
-        pe = md.element('plus'), 
+        ie = md.element('insert'), 
         fe = md.element('from');
     fe.innerHTML = fa.displayName;
     fe.title = fa.displayName;
-    this.edited_object = l;
-    for(let i = 0; i < aa.length; i++) {
-      const a = aa[i];
-      if(l.aspects.indexOf(a) < 0) options.push(a.displayName);
+    this.edited_object = link;
+    // Compile list of variables in scope.
+    for(let i = 0; i < ais.length; i++) {
+      list.push(ais[i].displayName);
     }
-    if(options.length) {
-      le.innerHTML = '<option>' +
-          options.sort().join('</option><option>') + '</option>';
-      pe.src = 'images/find.png';
-      pe.title = 'Select aspect within function scope';
-      pe.cursor = 'pointer';
+    const
+        html = [],
+        vis = list.sort((a, b) => UI.compareFullNames(a, b));
+    for(let i = 0; i < vis.length; i++) {
+      const v =  escapedSingleQuotes(vis[i]);
+      html.push(`<tr class="list">` +
+          `<td onclick="UI.insertAspectName('${v}')">${vis[i]}</td></tr>`);
+    }
+    le.innerHTML = '<table>' + html.join('') + '</table>';
+    if(vis.length) {
+      ie.classList.remove('disab');
+      ie.classList.add('enab');
     } else {
-      le.innerHTML = '';
-      pe.src = 'images/close.png';
-      pe.title = 'No aspects within scope';
-      pe.cursor = 'default';
+      ie.classList.remove('enab');
+      ie.classList.add('disab');
     }
+    ie.title = pluralS(vis.length, 'aspect') +
+        ` within scope of function "${fa.displayName}"`;
+    // Initially hide the variable list.
     le.style.display = 'none';
+    // Clear the name input field.
     ne.value = '';
-    ne.style.display = 'block';
     md.show('name');
   }
   
-  toggleSelectAspectButton() {
-    // Switches between drop-down box and text input field for aspect name. 
-    const
-        md = this.modals['add-aspect'],
-        ne = md.element('name'),
-        le = md.element('list'), 
-        pe = md.element('plus');
-    // Do not switch when no aspects are within scope.
-    if(!le.length) return;
-    // Otherwise, do toggle.
-    if(ne.style.display === 'none') {
-      le.style.display = 'none';
-      ne.style.display = 'block';
-      pe.src = `images/find.png`;
-      pe.title = 'Select aspect within function scope';
-    } else if(le.length) {
-      le.style.display = 'block';
-      ne.style.display = 'none';
-      pe.src = 'images/add.png';      
-      pe.title = 'Define new system aspect';
-    }
-  }
-
   addAspect() {
     const
         md = this.modals['add-aspect'],
@@ -2987,70 +3010,36 @@ console.log('HERE name conflicts', name_conflicts, mapping);
         le = md.element('list'), 
         n = (ne.style.display === 'none' ? le : ne).value.trim(),
         l = this.edited_object,
-        fa = l.from_activity,
-        aa = fa.aspectsInScope,
+        // NOTE: Explicitly look up the aspect, as we cannot tell from
+        // the `addAspect` method result whether this is a *new* aspect.
         oa = MODEL.objectByName(n),
-        a = MODEL.addAspect(n, fa);
+        // Always add the aspect to the model.
+        a = MODEL.addAspect(n, l);
+    // This may already fail (with error message, so just return).
     if(!a) return;
-    if(oa && aa.indexOf(a) < 0) {
-      this.warn('Aspect <strong>' + a.displayName +
+    if(oa) {
+      // If aspect already existed, it can only be added when it is
+      // within scope of the FROM activity of the selected link. 
+      const aa = l.from_activity.aspectsInScope;
+      if(aa.indexOf(a) < 0) {
+        this.warn('Aspect <strong>' + a.displayName +
           '</strong> is defined, but out of scope');
-      return;
+        return;
+      }
     }
-    addDistinct(a, l.aspects);
-    this.paper.drawLink(l);
+    this.edited_object = null;
+    // Select the aspect; this will redraw the link, highlighting the
+    // added aspect as selected.
+    MODEL.selectAspect(a, l);
+    this.updateButtons();
     md.hide();
   }
 
-  // Aspect modal
-
-  showAspectPropertiesDialog(a=null) {
-    // Open the aspect modal and set its fields to properties of `a`.
-    const
-        md = this.modals.aspect,
-        lbl = md.element('lbl');
-    lbl.innerText = a.displayName;
-    lbl.title = a.displayName;
-    md.element('name').value = a.name;
-    md.show('name');
+  showAspectPropertiesDialog(a) {
+    // NOTE: The aspect properties modal is the Expression Editor.
     this.edited_object = a;
+    X_EDIT.editExpression(a);
   }
   
-  updateAspectProperties() {
-    // Updates the edited aspect if all input is OK.
-    // @@TO DO: prepare for undo
-    const
-        md = this.modals.aspect,
-        asp = this.edited_object;
-    // Rename object if name has changed.
-    let nn = md.element('name').value.trim(),
-        nasp = asp.rename(nn);
-    // NOTE: When rename returns FALSE, a warning is already shown.
-    if(nasp !== true && nasp !== false) {
-      this.warningEntityExists(nasp);
-      return false;
-    }
-    let l = MODEL.linksWithAspect(asp);
-    for(let i = 0; i < l.length; i++) {
-      // Redraw the shape, as its appearance may have changed.
-      UI.paper.drawLink(l[i]);
-    }
-    md.hide();
-    this.edited_object = false;
-    return true;
-  }
-  
-  cancelEditAspect() {
-    // Not only hides the Aspect modal, but also clears the edited object.
-    this.modals.aspect.hide();
-    this.edited_object = false;    
-  }
-  
-  editAspectExpression() {
-    this.modals.aspect.hide();
-    // Show the expression editor.
-    X_EDIT.editExpression(this.edited_object);
-  }
-
 } // END of class GUIController
 

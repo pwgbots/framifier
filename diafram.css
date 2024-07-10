@@ -679,27 +679,7 @@ div.dragger {
   position: absolute;
   top: 24px;
   left: 41px;
-  width: 240px;
-}
-
-#add-aspect-list {
-  position: absolute;
-  top: 23px;
-  left: 41px;
-  width: 240px;
-  max-height: 20px;
-}
-
-#add-aspect-plus {
-  position: absolute;
-  top: 23px;
-  right: 2px;
-  width: 20px;
-  height: 20px;
-}
-
-#add-aspect-plus:hover {
-  filter: brightness(140%);
+  width: 248px;
 }
 
 /* styles for the ASPECT dialog */
@@ -989,58 +969,86 @@ img.inline-cancel-btn {
   height: 300px;
 }
 
-#expression-property {
+#expression-scope {
   display: inline-block;
   vertical-align: top;
+  margin-left: 10px;
   max-width: calc(100% - 185px);
   font-weight: normal;
-  font-style: italic;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;  
 }
 
 #expression-text {
-  width: calc(100% - 4px);
-  height: calc(100% - 70px);
-  margin: 1px 2px;
+  position: absolute;
+  top: 45px;
+  left: 2px;  width: calc(100% - 4.5px);
+  height: calc(100% - 72px);
   font: 12px monospace;
   overflow-y: hidden;
 }
 
-#variable-bar {
-  position: relative;
-  width: calc(100% - 4px);
-  margin: 2px 2px 1px 2px;
-}
-
-#variable-name {
-  width: calc(100% - 60px);
-  font-size: 12px;
-}
-
-#variable-insert {
+#expression-aspect-lbl {
   position: absolute;
-  right: 0;
-  top: 0;
-  width: 55px;
+  top: 26px;
+  left: 2px;
+}
+
+#expression-aspect {
+  position: absolute;
+  top: 24px;
+  right: 3px;
+  width: calc(100% - 45px);
+}
+
+#add-aspect-list,
+#expression-variables {
+  position: absolute;
+  left: calc(100% - 20px);
+  bottom: 2px;
+  min-width: 60px;
+  max-width: 190px;
   font-size: 12px;
+  background-color: #d8f0f8;
+  border: 2px solid #c0e0f8;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+#add-aspect-list > table,
+#expression-variables > table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#add-aspect-list > table > tbody > tr > td,
+#expression-variables > table > tbody > tr > td {
+  height: 16px;
+}
+
+#add-aspect-insert,
+#expression-insert {
+  position: absolute;
+  right: 1px;
+  bottom: 3px;
 }
 
 #expression-status {
   position: absolute;
   border: solid 1px #e2d8e8;
   bottom: 0;
-  width: calc(100% - 10px);
+  width: calc(100% - 30px);
   margin: 2px;
   padding: 2px;
 }
 
-#expression-info {
+#expression-help {
   display: none;
   position: absolute;
   border: solid 1px #e2d8e8;
   background-color: #fafcfe;
+  border-radius: 4px;
   top: 22px;
   left: 2px;
   width: calc(100% - 9px);
@@ -1050,19 +1058,19 @@ img.inline-cancel-btn {
   font-size: 13px;
 }
 
-#expression-info h3 {
+#expression-help h3 {
   margin: 0;
 }
 
-#expression-info h4 {
+#expression-help h4 {
   margin: 6px 0px 3px 0px;
 }
 
-#expression-info p {
+#expression-help p {
   margin: 0px 0px 3px 0px;
 }
 
-#expression-info code {
+#expression-help code {
   margin: 0px 2px 0px 2px;
 }
 

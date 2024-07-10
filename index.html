@@ -440,24 +440,9 @@ and move the cursor over the status bar">
       </div>
       <div id="add-aspect-name-lbl">Name:</div>
       <input id="add-aspect-name" type="text" autocomplete="off">
-      <select id="add-aspect-list"></select>
-      <img id="add-aspect-plus" src="images/add.png"
-           title="Define new system aspect">
-    </div>
-  </div>
-
-  <!-- The ASPECT dialog allows renaming an aspect and opening the
-       expression editor for its expression. -->
-  <div id="aspect-modal" class="modal">
-    <div id="aspect-dlg" class="inp-dlg">
-      <div class="dlg-title">
-        Edit aspect <div id="aspect-lbl"></div>
-        <img class="cancel-btn" src="images/cancel.png">
-        <img class="ok-btn" src="images/ok.png">
+      <img id="add-aspect-insert" src="images/aspect.png" class="sbtn enab">
+      <div id="add-aspect-list">
       </div>
-      <input id="aspect-name" type="text" autocomplete="off">
-      <img id="aspect-x-btn" src="images/aspect.png" class="sbtn enab"
-           title="Edit equation for this aspect">
     </div>
   </div>
 
@@ -522,20 +507,21 @@ and move the cursor over the status bar">
   <!-- EXPRESSION EDITOR dialog -->
   <div id="expression-modal" class="modal">
     <div id="expression-dlg" class="inp-dlg">
-      <div class="dlg-title">Editing expression for
-        <div id="expression-property"></div>
+      <div class="dlg-title">Edit system aspect
+        <div id="expression-scope"></div>
         <img class="cancel-btn" src="images/cancel.png">
         <img class="ok-btn" src="images/ok.png">
         <img class="info-btn" src="images/info.png">
       </div>
-      <div id="variable-bar">
-        <select id="variable-name"></select>
-        <button id="variable-insert">Insert</button>
-      </div>
+      <div id="expression-aspect-lbl">Name:</div>
+      <input id="expression-aspect" type="text" autocomplete="off">
       <textarea id="expression-text" autocomplete="off" autocorrect="off"
                 autocapitalize="off" spellcheck="false"></textarea>
       <div id="expression-status">&nbsp;</div>
-      <div id="expression-info">
+      <img id="expression-insert" src="images/aspect.png" class="sbtn enab">
+      <div id="expression-variables">
+      </div>
+      <div id="expression-help">
       </div>
     </div>
   </div>

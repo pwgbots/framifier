@@ -1120,22 +1120,8 @@ class VirtualMachine {
     // Let the model know that it should no longer display results in
     // the model diagram. 
     MODEL.solved = false;
-    // Number of blocks is at least 1, and is based on the simulation
-    // period  divided by the block length (without look-ahead).
-    // NOTES:
-    // (1) MODEL.runLength = simulation period + look-ahead, so that
-    //     should not be used to compute the number of blocks.
-    // (2) For each block, a chunk (block + lookahead) is optimized.
-    this.nr_of_time_steps = MODEL.end_period - MODEL.start_period + 1;
-
-    // EXAMPLE: Simulation period of 55 time steps, block length of 10
-    // time steps and no look-ahead => 6 chunks, and chunk length = block
-    // length = 10. If look-ahead = 8, then STILL 6 blocks, but now the
-    // *chunks* have 18 time steps, with the 5th *chunk* covering
-    // t=41 - t=58. This is already beyond the end of the simulation period
-    // (t=55), but with insufficient look-ahead (3), hence the 6th block
-    // covering t=51 through t=68, of which only the first five time step
-    // results will be used.
+    // NOTE: time etc. still has to be implemented.
+    this.nr_of_time_steps = 100;
 
     // Initialize error counters (error count will be reset to 0 for each
     // block).

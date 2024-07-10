@@ -928,8 +928,10 @@ class Paper {
     x1 = cx1 + 8 * fcpcos;
     y1 = cy1 + 8 * fcpsin;
     fcx = cx1 + dr * fcpcos;
-    // NOTE: Pull more up or down when TO lies left of FROM.
-    fcy = cy1 + dr * fcpsin + (dx < 0 ? Math.sign(dy) * (dr + 50) : 0);
+    // NOTE: Pull more up or down when TO lies left of FROM; otherwise
+    // stay a bit more horizontal so that line becomes a bit curved.
+    const udy = (dx < 0 ? Math.sign(dy) * (dr + 50) : - 0.5 * dr * fcpsin);
+    fcy = cy1 + dr * fcpsin + udy;
     // Likewise, the control point for the TO connector follows the
     // straight line up to +/- 60 degrees of its default angle.
     const
@@ -988,13 +990,17 @@ class Paper {
                 {'font-size': 9, 'pointer-events': 'auto'}),
             nimbus = (a.comments && DOCUMENTATION_MANAGER.visible ?
                 ', 0 0 3.5px rgb(0,80,255)' : '');
+        if(a === MODEL.selected_aspect) {
+          le.setAttribute('fill', UI.color.select);
+          le.setAttribute('font-weight', 700);
+        }
         le.setAttribute('style',
             'text-shadow: 0.5px 0.5px white, -0.5px -0.5px white, ' +
                 '0.5px -0.5px white, -0.5px 0.5px white' + nimbus);
         // Add identifying data attribute.
         le.setAttribute('data-id', aid);
-        // Add identifying data attribute.
-        le.setAttribute('data-id', aid);
+        // Add identifying data attribute for the link as well.
+        le.setAttribute('data-linkid', l.identifier);
         // Make aspect text responsive to cursor events...
         le.setAttribute('pointer-events', 'auto');
         le.addEventListener('mouseover', sauc);
