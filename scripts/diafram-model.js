@@ -731,7 +731,7 @@ class diaFRAMModel {
       // NOTE: ignore selected links and constraints, as these will be
       // "taken along" automatically
     }
-    UI.notify(pluralS(n, 'activity') + ' moved to activity ' + a.displayName);
+    UI.notify(pluralS(n, 'function') + ' moved to function ' + a.displayName);
     // Clear the selection WITHOUT redrawing the selected entities
     // (as these will no longer be part of the graph)
     this.clearSelection(false);

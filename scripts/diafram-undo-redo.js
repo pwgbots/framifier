@@ -53,7 +53,7 @@ class UndoEdit {
     // If the identifier is set, return the action followed by the class name
     // of the object. NOTE: `obj` should then not be NULL, but check anyway
     if(this.action === 'drop' || this.action == 'lift') {
-      return `Move ${pluralS(this.properties.length, 'node')} to activity ` +
+      return `Move ${pluralS(this.properties.length, 'function')} to function ` +
           MODEL.objectByID(this.object_id).displayName;
     } else if(this.object_id) {
       const
