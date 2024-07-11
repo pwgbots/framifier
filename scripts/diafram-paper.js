@@ -5,7 +5,6 @@ This tool is developed by Pieter Bots at Delft University of Technology.
 
 This JavaScript file (diafram-paper.js) provides the SVG diagram-drawing
 functionality for the diaFRAM model editor.
-
 */
 
 /*
@@ -664,13 +663,13 @@ class Paper {
   
   zoomOut() {
     if(UI.buttons.zoomout && !UI.buttons.zoomout.classList.contains('disab')) {
-      // Reducing graph by to less than 25% would seem not functional
+      // Reducing graph by to less than 25% would seem not functional.
       if(this.zoom_factor <= 4) this.doZoom(2);
     }
   }
   
   cursorPosition(x, y) {
-    // Returns [x, y] in diagram coordinates
+    // Return [x, y] in diagram coordinates.
     const
         rect = this.container.getBoundingClientRect(),
         top = rect.top + window.scrollY + document.body.scrollTop, 
@@ -685,7 +684,7 @@ class Paper {
   //
 
   dragLineToCursor(x1, y1, x2, y2) {
-    // NOTE: does not remove element; only updates path and opacity
+    // NOTE: Does not remove element; only updates path and opacity.
     let el = document.getElementById(this.drag_line);
     // Create it if not found
     if(!el) {
@@ -1063,7 +1062,7 @@ class Paper {
         {fill: fill_color, stroke: stroke_color,
             'stroke-width': stroke_width});
     // Draw inner shadow if activity has sub_activities.
-    if(act.sub_activities.length) {
+    if(!act.isLeaf) {
       act.shape.addPath(['M', x - (hw-2.5), ',', y, 'l', (qw-1), ',-', (hh-2),
           'l', (hw-2.5), ',0l', (qw-1), ',', (hh-2), 'l-', (qw-1), ',', (hh-2),
           'l-', (hw-2.5), ',0Z'],

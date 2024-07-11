@@ -446,10 +446,6 @@ and move the cursor over the status bar">
     </div>
   </div>
   
-  <!-- Pop-up list for linking to sub-activities -->
-  <div id="sub-activities-list" hidden="hidden">
-  </div>
-
   <!-- The CLONE dialog prompts for a prefix -->
   <div id="clone-modal" class="modal">
     <div id="clone-dlg" class="inp-dlg">
@@ -690,5 +686,23 @@ where X can be one or several of these letters: AFLS">
     </div>
   </div>  
 
+  <!-- Pop-up twin list for linking to sub-activities -->
+  <div id="sub-activities-modal" class="modal">
+    <div id="sub-activities-list">
+      <div id="sub-activities-from">
+        <div id="sub-activities-from-lbl">From &#x24C4; of:</div>
+        <div id="sub-activities-from-sa">
+          <table id="sub-activities-from-table"></table>
+        </div>
+      </div>
+      <div id="sub-activities-to">
+        <div id="sub-activities-to-lbl">To</div>
+        <div id="sub-activities-to-sa">
+          <table id="sub-activities-to-table"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+  
 </body>
 </html>

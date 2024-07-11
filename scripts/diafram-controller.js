@@ -7,7 +7,6 @@ This JavaScript file (diafram-r-controller.js) provides the GUI controller
 functionality for the FRAM model editor: buttons on the main tool bars,
 the associated modal dialogs (class ModalDialog), and the related event
 handler functions.
-
 */
 
 /*
@@ -183,6 +182,7 @@ class GUIController {
     this.from_activity = null;
     this.to_connector = null;
     this.to_activity = null;
+    this.connection_data = null;
     this.last_up_down_without_move = Date.now();
     // Keyboard shortcuts: Ctrl-x associates with menu button ID.
     this.shortcuts = {
@@ -252,9 +252,9 @@ class GUIController {
   }
 
   pointInViewport(rx, ry) {
-    // Returns paper coordinates of the cursor position if the cursor were
+    // Return paper coordinates of the cursor position if the cursor were
     // located at relative position (rx * window width, ry * window height)
-    // in the browser window
+    // in the browser window.
     if(this.paper) return this.paper.cursorPosition(
           window.innerWidth *rx, window.innerHeight *ry);
     // If no graphics return values for a 100x100 pixel viewport
@@ -279,8 +279,8 @@ class GUIController {
   }
 
   stringToLineArray(string, width=100, fsize=8) {
-    // Returns an array of strings wrapped to given width at given font size
-    // while preserving newlines -- used to format text of notes
+    // Return an array of strings wrapped to given width at given font
+    // size while preserving newlines -- used to format text of notes.
     const
         multi = [],
         lines = string.split('\n'),
@@ -586,7 +586,7 @@ class GUIController {
     // Aspects can be dragged from the Finder to add them to a link.
     this.cc.addEventListener('dragover', (event) => UI.dragOver(event));
     this.cc.addEventListener('drop', (event) => UI.drop(event));
-
+    
     // Disable dragging on all images.
     const
         imgs = document.getElementsByTagName('img'),
@@ -762,7 +762,24 @@ class GUIController {
     this.paste_modal.cancel.addEventListener('click',
         () => UI.paste_modal.hide());
     
-    // Add all draggable stay-on-top dialogs as controller properties.
+    // Ensure that clicking activities list modal cancels the connection.
+    // NOTE: Clicking on list items generates mouse events for this modal.
+    // Therefore, the connecting actions are called from this routine.
+    // The necessary data is passed by the list elements.
+    this.from_to_modal = document.getElementById('sub-activities-modal');
+    this.from_to_modal.addEventListener('click',
+        (event) => {
+          // Abort making the connection only when modal is clicked, not
+          //  when the list is clicked.
+          if(event.target === UI.from_to_modal) {
+            UI.connection_to_make.aspect = '';
+            UI.completeConnection();
+          } else if(event.target.nodeName === 'TD') {
+            // This can only occur when a subactivity name is clicked.
+            const ds = event.target.dataset;
+            UI.connectSubActivity(ds.ft, ds.id); 
+          }
+        });
     
     // Make checkboxes respond to click.
     // NOTE: Checkbox-specific events must be bound AFTER this general setting.
@@ -1334,89 +1351,156 @@ class GUIController {
       document.onmouseup = null;
       document.onmousemove = null;
       UI.updateCursorPosition(e);
-      if(UI.to_activity.sub_activities.length) {
-        // Prompt modeler to select specific activity to link to.
-        UI.promptForSubActivity();
+      // Store connection data so it will not be erased by mouse events.
+      const ctm = {
+          fact: UI.from_activity,
+          tact: UI.to_activity,
+          fcon: UI.from_connector,
+          tcon: UI.to_connector,
+          fsub: [],
+          tsub: [],
+          aspect: '' 
+        };
+      if(ctm.fact) ctm.fsub = ctm.fact.leafActivities;
+      if(ctm.tact) ctm.tsub = ctm.tact.leafActivities;
+      if(ctm.tact && ctm.tcon) ctm.aspect = ctm.tcon.dataset.aspect;
+      UI.connection_to_make = ctm;
+      if(ctm.fsub.length || ctm.tsub.length) {
+        // Prompt modeler to specify which subactivity to link from/to.
+        UI.promptForSubActivities();
       } else {
-        UI.completeConnection(UI.to_activity);
+        // Complete, or abort when no aspect has been set.
+        UI.completeConnection();
       }
     }
   }
 
-  completeConnection(to_act) {
-    // Terminate the connection process. Only add the connection when
-    // `to_act` is not NULL. Otherwise, just clean up the view.
-    // Always hide dashed arrow.
+  completeConnection() {
+    // Terminate the connection process.
+    // Always hide dashed dragline arrow.
     this.paper.hideDragLine();
-    // De-highlight the FROM connector (double-check that it exists).
-    const
-        fc = this.from_connector,
-        tc = this.to_connector;
-    if(fc) {
-      fc.style.stroke = this.color.rim;
-      fc.style.strokeWidth = 0.75;
-      fc.style.fill = 'white';
+    // Ensure that dragline events are reset.
+    document.onmouseup = null;
+    document.onmousemove = null;
+    // Always hide the sub-activities list (but it may not be showing).
+    this.from_to_modal.style.display = 'none';
+    const ctm = this.connection_to_make;
+    // De-highlight the connectors (if known).
+    if(ctm.fcon) {
+      ctm.fcon.style.stroke = this.color.rim;
+      ctm.fcon.style.strokeWidth = 0.75;
+      ctm.fcon.style.fill = 'white';
     }
-    // Make connection if possible.
-    if(tc) {
-      // De-highlight the TO-connector. 
-      tc.style.stroke = UI.color.rim;
-      tc.style.fill = 'white';
-      tc.style.strokeWidth = 0.75;
-      // Connect only when to_act is defined.
-      if(to_act) {
-        const l = MODEL.addLink(this.from_activity, to_act,
-            tc.dataset.aspect);
-        if(to_act === this.to_activity) {
-          // Normal connection between visible activities
-          // NOTE: Draw link with both nodes, as they may change from
-          // background to foreground functions.
-          this.drawObject(l.from_activity);
-          this.drawObject(l.to_activity);
-          this.drawObject(l);
-        } else {
-          // Connection with an invisible sub-activity.
-          UI.notify('Linking to ' + to_act.displayName);
-        }
+    if(ctm.tcon) {
+      ctm.tcon.style.stroke = UI.color.rim;
+      ctm.tcon.style.fill = 'white';
+      ctm.tcon.style.strokeWidth = 0.75;
+    }
+    // Only add the connection when it is fully specified. If not, the
+    // aspect will be empty still, and evaluate as FALSE.
+    if(ctm.aspect) {
+      const l = MODEL.addLink(ctm.fact, ctm.tact, ctm.aspect);
+      if(ctm.fsub.length || ctm.tsub.length) {
+        // Connection with an invisible sub-activity.
+        // @@@ TO DO: Draw compound link.
+        UI.notify(`Added link: ${l.displayName}`);
+      } else {
+        // Normal connection between visible activities
+        // NOTE: Draw link with both nodes, as they may change from
+        // background to foreground functions.
+        this.drawObject(l.from_activity);
+        this.drawObject(l.to_activity);
+        this.drawObject(l);
       }
     }
     // Terminate the connection process.
+    this.connection_to_make = null;
     this.from_connector = null;
     this.from_activity = null;
     this.to_connector = null;
     this.to_activity = null;
   }
+  
+  subActivityTable(sub, from_to) {
+    // Return HTML for table with subactivity names.
+    const
+        names = [],
+        html = [];
+    for(let i = 0; i < sub.length; i++) {
+      names.push(sub[i].displayName);
+    }
+    const sn = names.sort((a, b) => UI.compareFullNames(a, b));
+    for(let i = 0; i < sn.length; i++) {
+      const tid = this.nameToID(sn[i]);
+      html.push(`<tr class="list"><td data-ft="${from_to}" data-id="${tid}">` + 
+          `${sn[i]}</td></tr>`);
+    }
+    return html.join('');
+  }
 
-  promptForSubActivity() {
+  promptForSubActivities() {
     // Display list of sub-activities to choose from.
     // If none is selected (mouseout without click), no connection is made.
-    if(this.from_activity && this.to_activity) {
+    const ctm = this.connection_to_make;
+    if(ctm.aspect) {
       const
-          el = document.getElementById('sub-activities-list'),
-          ta = this.to_activity.sub_activities,
-          names = [],
-          html = [];
-      for(let i = 0; i < ta.length; i++) {
-        names.push(ta[i].displayName);
+          le = document.getElementById('sub-activities-list'),
+          fe = document.getElementById('sub-activities-from'),
+          te = document.getElementById('sub-activities-to'),
+          tlbl = document.getElementById('sub-activities-to-lbl'),
+          ftbl = document.getElementById('sub-activities-from-table'),
+          ttbl = document.getElementById('sub-activities-to-table');
+      let max = 0;
+      tlbl.innerText = `To ${circledLetter(ctm.aspect)} of:`;
+      if(ctm.fsub.length) {
+        max = ctm.fsub.length;
+        ftbl.innerHTML = this.subActivityTable(ctm.fsub, 'from');
+        fe.style.display = 'inline-block';
+      } else {
+        fe.style.display = 'none';        
       }
-      const suba = names.sort((a, b) => UI.compareFullNames(a, b));
-      for(let i = 0; i < suba.length; i++) {
-        const a =  this.nameToID(suba[i]);
-        html.push(`<tr class="list">` +
-            `<td onclick="UI.connectToSubActivity('${a}')">${suba[i]}</td></tr>`);
+      if(ctm.tsub.length) {
+        max = Math.max(max, ctm.tsub.length);
+        ttbl.innerHTML = this.subActivityTable(ctm.tsub, 'to');
+        te.style.display = 'inline-block';
+      } else {
+        te.style.display = 'none';        
       }
-      el.innerHTML = '<table>' + html.join('') + '</table>';
       // Position the pop-up list.
-      el.style.bottom = '300px';
-      el.style.left = '300px';
-      el.style.display = 'block';
+      const
+          dx = ctm.tact.width * (ctm.aspect === 'I' ? 1 :
+                  ('PT'.indexOf(ctm.aspect) >= 0 ? 0.75 : 0.25)),
+          dy = ctm.tact.height * ('TC'.indexOf(ctm.aspect) >= 0 ?
+              0 : ('IO'.indexOf(ctm.aspect) >= 0 ? 0.5 : 1)),
+          zf = this.paper.zoom_factor,
+          // List height depends on highest number of leaf activities.
+          lh = 19 * max + 28;
+      le.style.top = Math.max(this.page_y - dy / zf - lh, 45) + 'px';
+      le.style.left = (this.page_x + dx / zf) + 'px';
+      // Display list on top of a near-transparent DIV to prevent
+      // interaction with other screen elements.
+      this.from_to_modal.style.display = 'block';
     }
   }
   
-  connectToSubActivity(id) {
+  connectSubActivity(from_to, id) {
     // Connect to the selected sub-activity, or abort if not recognized.
-    document.getElementById('sub-activities-list').style.display = 'none';
-    completeConnection(MODEL.nodeByID(id));
+    const
+        ctm = this.connection_to_make,
+        a = MODEL.activityByID(id);
+    if(!a) {
+      this.alert(`No activity with ID "${id}"`);
+    } else if(from_to === 'from') {
+      ctm.fact = a;
+    } else {
+      ctm.tact = a;
+    }
+    document.getElementById('sub-activities-' + from_to)
+        .style.display = 'none';
+    if(ctm.fact.isLeaf && ctm.tact.isLeaf) {
+      ctm.aspect = ctm.tcon.dataset.aspect;
+      this.completeConnection();
+    }
   }
   
   
@@ -1531,7 +1615,10 @@ class GUIController {
   //
   
   updateCursorPosition(e) {
-    // Updates the cursor coordinates and displays them on the status bar
+    // Update the cursor coordinates and display. them on the status bar.
+    // NOTE: Also store the screen coordinates to facilitate pop-up lists.
+    this.page_x = e.pageX - window.scrollX - document.body.scrollLeft;
+    this.page_y = e.pageY - window.scrollY - document.body.scrollTop;
     const cp = this.paper.cursorPosition(e.pageX, e.pageY);
     this.mouse_x = cp[0];
     this.mouse_y = cp[1];
@@ -1552,7 +1639,7 @@ class GUIController {
     
     //console.log(e);
     const fa = MODEL.focal_activity;
-    for(let i = fa.sub_activities.length-1; i >= 0; i--) {
+    for(let i = fa.sub_activities.length - 1; i >= 0; i--) {
       const a = fa.sub_activities[i];
       if(a != this.dragged_node && a.containsPoint(this.mouse_x, this.mouse_y)) {
         this.on_activity = a;
@@ -1587,9 +1674,13 @@ class GUIController {
       this.paper.dragRectToCursor(this.start_sel_x, this.start_sel_y,
           this.mouse_x, this.mouse_y);
     } else if(this.dragged_node) {
-      MODEL.moveSelection(
-          this.mouse_x - this.move_dx - this.dragged_node.x,
-          this.mouse_y - this.move_dy - this.dragged_node.y);
+      if(MODEL.selection.length) {
+        MODEL.moveSelection(
+            this.mouse_x - this.move_dx - this.dragged_node.x,
+            this.mouse_y - this.move_dy - this.dragged_node.y);
+      } else {
+        this.dragged_node = null;
+      }
     }
     let cr = 'pointer';
     const on_entity = (this.on_aspect || this.on_link || this.on_activity);
@@ -1741,6 +1832,7 @@ class GUIController {
       UNDO_STACK.push('move', this.dragged_node, true);
     } else { 
       MODEL.deselectAspect();
+      this.dragged_node = null;
       this.start_sel_x = this.mouse_x;
       this.start_sel_y = this.mouse_y;
     }
@@ -1912,7 +2004,14 @@ class GUIController {
     // NOTE: Consider only the top modal (if any is showing).
     if(code === 'Escape') {
       e.stopImmediatePropagation();
-      if(topmod) topmod.style.display = 'none';
+      if(topmod) {
+        if(topmod === this.from_to_modal) {
+          // Abort making the connection.
+          this.connection_to_make.aspect = '';
+          this.completeConnection();
+        }
+        topmod.style.display = 'none';
+      }
     } else if(code === 'Enter' && ttype !== 'textarea') {
       e.preventDefault();
       if(topmod) {

@@ -1096,13 +1096,15 @@ class diaFRAMModel {
               name = xmlDecoded(nodeContentByTag(c, 'name')),
               actor = xmlDecoded(nodeContentByTag(c, 'owner')),
               a = this.addActivity(name, actor, c);
-          // NOTE: Top activity will already exist, so initialize it explicitly.
+          // NOTE: Top activity will already exist, and then no `initFromHTML`
+          // will be executed => initialize it explicitly.
           if(a === this.top_activity) a.initFromXML(c);
         }
       }
     }
     // Special action is needed to re-establish the activity hierarchy.
     this.rescueOrphans();
+    // Now links can be added.
     n = childNodeByTag(node, 'links');
     if(n && n.childNodes) {
       for(let i = 0; i < n.childNodes.length; i++) {
@@ -1164,9 +1166,9 @@ class diaFRAMModel {
     // Set the correct parent activities.
     for(let i = 0; i < this.orphan_list.length; i++) {
       const
-          p = this.orphan_list[i][0],
-          a = this.activityByCode(this.orphan_list[i][1]);
-      if(a instanceof Activity) a.setParent(p);
+          o = this.orphan_list[i],
+          a = this.activityByCode(o.subact);
+      if(a instanceof Activity) a.setParent(o.parent);
     }
   }
   
@@ -1803,13 +1805,16 @@ class Activity extends NodeBox {
         const c = n.childNodes[i];
         if(c.nodeName === 'activity-code') {
           const
-              code = safeStrToInt(nodeContent(c)),
+              code = nodeContent(c),
               a = MODEL.activityByCode(code);
-          // NOTE: Sub-activity may not have been created yet.
           if(a) {
+            // Sub-activity already exists => set this activity as its
+            // parent.
             a.setParent(this);
           } else {
-            MODEL.orphan_list.push([this, code]);
+            // Sub-activity not created yet => add code of sub-activity
+            // to the orphan list with this activity as its future parent.
+            MODEL.orphan_list.push({subact: code, parent: this});
           }
         }
       }
@@ -1836,8 +1841,8 @@ class Activity extends NodeBox {
       if(i >= 0) this.parent.sub_activities.splice(i, 1);
       // Set its new activity pointer...
       this.parent = pa;
-      // ... and add it to the new parent's activity list
-      if(pa.sub_activities.indexOf(this) < 0) pa.sub_activities.push(this);
+      // ... and add it to the new parent's activity list.
+      addDistinct(this, pa.sub_activities);
     }
   }
   
@@ -1877,6 +1882,26 @@ class Activity extends NodeBox {
       sa = sa.concat(this.sub_activities[i].allActivities); // recursion!
     }
     return sa;
+  }
+  
+  get isLeaf() {
+    // Return TRUE if this activity has no sub-activities.
+    return this.sub_activities.length === 0;
+  }
+  
+  get leafActivities() {
+    // Return the set of all descendant activities of this activity
+    // that themselves have no subactivities.
+    let la = [];
+    for(let i = 0; i < this.sub_activities.length; i++) {
+      const sa = this.sub_activities[i];
+      if(sa.isLeaf) {
+        la.push(sa);
+      } else {
+        la = la.concat(sa.leafActivities); // recursion!
+      }
+    }
+    return la;    
   }
 
   get relatedLinks() {

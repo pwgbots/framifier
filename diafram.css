@@ -1002,8 +1002,9 @@ img.inline-cancel-btn {
   width: calc(100% - 45px);
 }
 
-#sub-activities-list,
 #add-aspect-list,
+#sub-activities-from,
+#sub-activities-to,
 #expression-variables {
   position: absolute;
   left: calc(100% - 20px);
@@ -1017,17 +1018,46 @@ img.inline-cancel-btn {
   border-radius: 3px;
 }
 
-#sub-activities-list > table,
 #add-aspect-list > table,
 #expression-variables > table {
   width: 100%;
   border-collapse: collapse;
 }
 
-#sub-activities-list > table > tbody > tr > td,
+#sub-activities-from-table,
+#sub-activities-to-table {
+  width: 100%;
+  pointer-events: all;
+}
+
+#sub-activities-from-table > tbody > tr > td,
+#sub-activities-to-table > tbody > tr > td,
 #add-aspect-list > table > tbody > tr > td,
 #expression-variables > table > tbody > tr > td {
   height: 16px;
+}
+
+#sub-activities-modal {
+  background-color: rgba(0, 64, 128, 0.05) !important;
+}
+
+#sub-activities-list {
+  position: absolute;
+}
+
+#sub-activities-from,
+#sub-activities-to {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  display: inline-block;
+  max-height: 120px;
+  overflow: scroll;
+}
+
+#sub-activities-from-lbl,
+#sub-activities-to-lbl {
+  font-weight: bold;
 }
 
 #add-aspect-insert,
