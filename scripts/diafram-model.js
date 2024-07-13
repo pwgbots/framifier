@@ -198,16 +198,15 @@ class diaFRAMModel {
       // NOTE: link IDs are based on node codes, not node names
       const nn = name.split(UI.LINK_ARROW),
           // NOTE: recursive calls to objectByName
-          fn = this.objectByName(nn[0]),
+          fa = this.objectByName(nn[0]),
           // NOTE: Link names have connector symbol after arrow...
-          tnc = [...nn[1]],
+          tac = [...nn[1]],
           // ... so this has to be removed...
-          c = tnc.shift(),
+          c = tac.shift(),
           // ... before we can look up the activity name.
-          tn = this.objectByName(tnc.join(''));
+          ta = this.objectByName(tac.join(''));
       if(i === 0) {
-        // NOTE: three underscores denote the link arrow
-        if(fn && tn) return this.linkByID(fn.code + '___' + c + tn.code);
+        if(fa && ta) return this.linkByID(UI.linkIdentifier(fa, ta, c));
         return null;
       }
     }
@@ -383,16 +382,19 @@ class diaFRAMModel {
       UI.warningInvalidName(name);
       return null;
     }
-    let nb = this.namedObjectByID(UI.nameToID(name));
-    if(nb) {
-      // If activity by this name already exists, add it to the link
+    let obj = this.namedObjectByID(UI.nameToID(name));
+    if(obj) {
+      // If aspect by this name already exists, add it to the link
       // (if specified) and return it.
-      if(nb instanceof Aspect) {
-        if(link) addDistinct(nb, link.aspects);
-        return nb;
+      if(obj instanceof Aspect) {
+        if(link) addDistinct(obj, link.aspects);
+        // NOTE: Aspect may have been restored after deletion, and then
+        // have no parent yet.
+        obj.parent = link.from_activity;
+        return obj;
       }
       // Otherwise, warn the modeler.
-      UI.warningEntityExists(nb);
+      UI.warningEntityExists(obj);
       return null;
     }
     const a = new Aspect(name, link ? link.from_activity : null);
@@ -406,9 +408,8 @@ class diaFRAMModel {
   }
 
   addLink(from_a, to_a, to_c, node=null) {
-    // NOTE: A link ID has THREE underscores between its node IDs.
-    const id = from_a.code + '___' + circledLetter(to_c) + to_a.code;
-    let l = this.linkByID(id);
+    // Add link between FROM and TO activity with specified connector.
+    let l = this.linkByID(UI.linkIdentifier(from_a, to_a, to_c));
     if(l !== null) {
       if(node) l.initFromXML(node);
       return l;
@@ -474,12 +475,25 @@ class diaFRAMModel {
   selectAspect(a, l) {
     // Aspects are not added to the selection, as they can not be moved.
     // Therefore, clear the selection.
+    // NOTE: Before doing that, check whether `l` was drawn as a deep
+    // link, and if so, redraw the deep link.
+    let dl;
+    if(UI.aspect_ddl_id) {
+      dl = UI.paper.drawn_deep_links[UI.aspect_ddl_id];
+    } else {
+      dl = UI.paper.comprisingDeepLink(l);
+      // NOTE: After delete aspect - undo delete, the deep link will not
+      // have this aspect anymore, so add it to its aspect list.  
+      if(dl) addDistinct(a, dl.aspects);
+    }
     this.clearSelection();
     this.selected_aspect = a;
     this.selected_aspect_link = l;
-    // NOTE: Redraw of link is needed to highlight because aspects do not
-    // have their own shape.
-    UI.drawObject(l);
+    // NOTES:
+    // (1) Redraw of link is needed to highlight because aspects do not
+    //     have their own shape.
+    // (2) Link may be a deep link that should be drawn as such.
+    UI.paper.drawLink(dl || l);
   }
   
   deselectAspect() {
@@ -872,8 +886,7 @@ class diaFRAMModel {
     // NOTE: When aspect is selected, this requires different action.
     if(this.selected_aspect) {
       this.selected_aspect.removeFromLink(this.selected_aspect_link);
-      this.selected_aspect = null;
-      this.selected_aspect_link = null;
+      this.deselectAspect();
       return;
     }
     let obj,
@@ -896,7 +909,7 @@ class diaFRAMModel {
       if(obj instanceof Note) {
         fc.deleteNote(obj);
       } else {
-        this.deleteNode(obj);
+        this.deleteActivity(obj);
       }
     }
     UI.drawDiagram(this);
@@ -1112,11 +1125,11 @@ class diaFRAMModel {
         if(c.nodeName === 'link') {
           const
               fc = nodeContentByTag(c, 'from-code'),
-              fn = this.activityByCode(fc),
+              fa = this.activityByCode(fc),
               tc = nodeContentByTag(c, 'to-code'),
-              tn = this.activityByCode(tc);
-          if(fn && tn) {
-            this.addLink(fn, tn, nodeParameterValue(c, 'connector'), c);
+              ta = this.activityByCode(tc);
+          if(fa && ta) {
+            this.addLink(fa, ta, nodeParameterValue(c, 'connector'), c);
           } else {
             console.log('ERROR: Failed to add link from', fc, 'to', tc);
           }
@@ -1498,10 +1511,6 @@ class NodeBox extends ObjectWithXYWH {
     return this.name;
   }
   
-  get infoLineName() {
-    return `<em>${this.type}:</em> ${this.displayName}`;
-  }
-
   get identifier() {
     // Preserve names starting with an underscore (typically system variables)
     if(this.name.startsWith('_')) return UI.nameToID(this.name);
@@ -1633,6 +1642,15 @@ class Aspect extends NodeBox {
     return 'A';
   }
 
+  get infoLineName() {
+    let extra = '';
+    if(this.activity) {
+       extra = '<span class="extra">(scope: '+ this.activity.displayName +
+            ')</span>';
+    }
+    return `<em>System aspect:</em> ${this.displayName}${extra}`;
+  }
+
   setCode() {
     // Aspects are assigned a unique number code for shorthand display of links.
     if(!this.code) {
@@ -1642,7 +1660,7 @@ class Aspect extends NodeBox {
 
   get asXML() {
     return ['<aspect code="', this.code, '">',
-        '<name>',  xmlEncoded(this.name),
+        '<name>', xmlEncoded(this.name),
         '</name><comments>', xmlEncoded(this.comments),
         '</comments><expression>', xmlEncoded(this.expression.text),
         '</expression></aspect>'].join('');
@@ -1658,20 +1676,32 @@ class Aspect extends NodeBox {
   removeFromLink(l) {
     // Remove this aspect from its parent link, and also from the model
     // if this link is the only one having this aspect.
-    // @@TO DO: prepare for undo!
+    // @@TO DO: Add undo data!
     if(!l) return;
     const n = l.aspects.indexOf(this);
+    let xml = '';
     // Remove aspect from list.
-    if(n >= 0) l.aspects.splice(n, 1);
+    if(n >= 0) {
+      l.aspects.splice(n, 1);
+      xml = `<link-aspect code="${this.code}" link="${l.identifier}"></link-aspect>`;
+    }
     // NOTE: Aspect can only occur within its parent activity scope.
     const ais = this.parent.aspectsInScope;
     if(ais.indexOf(this) < 0) {
       // No more occurrence => remove aspect from model.
       const msg = `Aspect "${this.displayName}" removed from model`;
+      xml = this.asXML + xml;
       delete MODEL.aspects[this.identifier];
       UI.notify(msg);
     }
-    UI.drawObject(l);
+    // Also remove aspect from comprising deep link (if any).
+    const cdl = UI.paper.comprisingDeepLink(l);
+    if(cdl) {
+      const ndl = l.aspects.indexOf(this);
+      if(ndl) cdl.aspects.splice(n, 1);
+    }
+    UNDO_STACK.addXML(xml);
+    UI.paper.drawLink(cdl || l);
     UI.updateButtons();
   }
   
@@ -1700,6 +1730,15 @@ class Activity extends NodeBox {
     return 'F';
   }
   
+  get infoLineName() {
+    let extra = '';
+    if(this.sub_activities.length) {
+       extra = `<span class="extra">(${pluralS(this.leafActivities.length,
+            'function')})</span>`;
+    }
+    return `<em>Function:</em> ${this.displayName}${extra}`;
+  }
+
   get countLinksInOut() {
     // Return object with the number of incoming and outgoing links
     // of this activity as properties.
@@ -1929,34 +1968,120 @@ class Activity extends NodeBox {
     return vl;
   }
   
-  deepLinks(a) {
-    // Return a lookup-object of all links that connect some sub-activity
-    // of the parent of this activity with activity `a` or any of its
-    // sub-activities. The lookup-object categorizes links by their
-    // connector.
-    const dl = {C: [], O: [], R: [], P: [], I: [], T: []};
-    if(!a.parent) return dl;
+  get deepVisibleLinks() {
+    // Return a list with data on all links within this activity that
+    // connect a leaf of a non-leaf sub-activity A to a leaf of another
+    // non-leaf subactivity B, but are not visible as "normal" links.
+    // The data is stored as instances of class Link having the visible
+    // activities as FROM and TO plus a list of constituing links. When
+    // drawn, this list signals "this is a deep link" when it is non-empty.
     const
-        sa = a.parent.sub_activities,
-        aa = a.allActivities;
-    aa.push(a);
-    for(let k in MODEL.links) if(MODEL.hasOwnProperty(k)) {
-      const
-          l = MODEL.links(k),
-          fa = l.from_activity,
-          ta = l.to_activity;
-      if(sa.indexOf(ta) >= 0) {
-        dl.O.push(l);
-      } else if(sa.indexOf(fa) >= 0) {
-        dl[l.connector].push(l);
+        la = this.leafActivities,
+        nla = {},
+        dvl = {};
+    // Create lookup with per non-leaf the list of its leaves. 
+    for(let i = 0; i < this.sub_activities.length; i++) {
+      const sa = this.sub_activities[i];
+      if(!sa.isLeaf) {
+        nla[sa.identifier] = sa.leafActivities;
       }
     }
-    return dl;
+    // Peruse all links in the model.
+    for(let k in MODEL.links) if(MODEL.links.hasOwnProperty(k)) {
+      const
+          l = MODEL.links[k],
+          fa = l.from_activity,
+          ta = l.to_activity;
+      let vfa = null,
+          vta = null,
+          deep = false;
+      if(la.indexOf(fa) >= 0 && la.indexOf(ta) >= 0) {
+        // Link `l` connects two leaf activities in this activity.
+        // Now determine the visible nodes for this link.
+        if(this.sub_activities.indexOf(fa) >= 0) {
+          // FROM node is a leaf of this activity.
+          vfa = fa;
+        } else {
+          // Find non-leaf that contains the FROM node.
+          for(let k in nla) if(nla.hasOwnProperty(k)) {
+            if(nla[k].indexOf(fa) >= 0) {
+              vfa = MODEL.activities[k];
+              break;
+            }
+          }
+          // If not an immediate sub-activity, it is a "deep" link.
+          if(vfa) deep = true;
+        }
+        // Do likewise for the TO node.
+        if(this.sub_activities.indexOf(ta) >= 0) {
+          // FROM node is a leaf of this activity.
+          vta = ta;
+        } else {
+          // Find non-leaf that contains the FROM node.
+          for(let k in nla) if(nla.hasOwnProperty(k)) {
+            if(nla[k].indexOf(ta) >= 0) {
+              vta = MODEL.activities[k];
+              break;
+            }
+          }
+          // Not an immediate sub-activity, so it is a "deep" link.
+          if(vta) deep = true;
+        }
+        if(deep) {
+          if(!vfa || !vta) {
+            // This anomaly should not occur => throw exception.
+            throw 'ERROR: link node(s) not found for ' + l.displayName;
+          }
+          if(vfa !== vta) {
+            // Two *different* nodes found, and at least one is "deep".
+            const dlid = UI.linkIdentifier(vfa, vta, l.to_connector);
+            let dl = dvl[dlid];
+            if(!dl) {
+              // Create a new virtual link and add link to its set.
+              dl = new Link(vfa, vta, l.to_connector);
+              dvl[dlid] = dl;
+            }
+            dl.deep_links.push(l);
+            // Add all aspects of `l` to those of `dl`.
+            for(let j = 0; j < l.aspects.length; j++) {
+              addDistinct(l.aspects[j], dl.aspects);
+            }
+          }
+        }
+      }
+    }
+    return dvl;
   }
 
   containsLink(l) {
     // Returns TRUE iff link `l` is related to some activty in this activity.
     return this.relatedLinks.indexOf(l) >= 0;
+  }
+  
+  get contextualLinks() {
+    // Return a lookup object with for each connector the list of links
+    // that connect to this connector but are not visible in the focal
+    // activity diagram.
+    const
+        ala = MODEL.top_activity.leafActivities,
+        pla = this.parent.leafActivities,
+        ca = complement(ala, pla),
+        la = this.leafActivities,
+        cl = {C: [], O: [], R: [], P: [], I: [], T: []};
+    // NOTE: This activity may itself be a leaf. 
+    la.push(this);
+    for(let k in MODEL.links) if(MODEL.links.hasOwnProperty(k)) {
+      const l = MODEL.links[k];
+      // Only consider contextual links.
+      if(ca.indexOf(l.from_activity) >= 0 || ca.indexOf(l.to_activity) >= 0) {
+        if(la.indexOf(l.to_activity) >= 0) {
+          cl[l.to_connector].push(l);
+        } else if(la.indexOf(l.from_activity) >= 0) {
+          cl.O.push(l);
+        }
+      }
+    }
+    return cl;
   }
   
   linkInList(l, list) {
@@ -1986,9 +2111,16 @@ class Activity extends NodeBox {
     if(this.parent !== MODEL.focal_activity) return;
     UI.drawObject(this);
     // Draw related links.
-    for(let k in MODEL.links) if(MODEL.links.hasOwnProperty(k)) {
-      const l = MODEL.links[k];
-      if(l.from_activity === this || l.to_activity === this) UI.drawObject(l);
+    if(this.isLeaf) {
+      for(let k in MODEL.links) if(MODEL.links.hasOwnProperty(k)) {
+        const l = MODEL.links[k];
+        if(l.from_activity === this || l.to_activity === this) UI.drawObject(l);
+      }
+    } else {
+      const dvl = this.deepVisibleLinks;
+      for(let k in dvl) if(dvl.hasOwnProperty(k)) {
+        this.drawLink(dvl[k]);
+      }
     }
   }
   
@@ -1999,11 +2131,11 @@ class Activity extends NodeBox {
     this.comments = a.comments;
   }
 
-  deleteNote(n, with_xml=true) {
+  deleteNote(n) {
     // Remove note `n` from this activity's note list.
     let i = this.notes.indexOf(n);
     if(i >= 0) {
-      if(with_xml) UNDO_STACK.addXML(n.asXML);
+      UNDO_STACK.addXML(n.asXML);
       this.notes.splice(i, 1);
     }
     return i > -1;
@@ -2050,6 +2182,10 @@ class Link {
     this.is_feedback = false;
     this.visited = false;
     this.selected = false;
+    // Deep links are inferred when drawing the links of a diagram.
+    // When not empty, this indicates that this link is a "virtual
+    // container" for multiple "real" links.
+    this.deep_links = [];
     // For drawing, a link has its own shape (mouse responsive)
     this.shape = UI.createShape(this);
   }
@@ -2068,10 +2204,10 @@ class Link {
   }
 
   get identifier() {
-    // NOTE: link IDs are based on the node codes rather than IDs, as this
-    // prevents problems when nodes are renamed
-    return this.from_activity.code + '___' + circledLetter(this.to_connector) +
-        this.to_activity.code;
+    // NOTE: link IDs are based on the activity codes rather than IDs,
+    // as this prevents problems when activities are renamed.
+    return UI.linkIdentifier(this.from_activity, this.to_activity,
+        this.to_connector);
   }
 
   get asXML() {
@@ -2132,10 +2268,10 @@ class Link {
     return [fv, tv];
   }
   
-  get hasArrow() {
-    // Returns TRUE if both nodes are visible
-    const vn = this.visibleNodes;
-    return vn[0] && vn[1];
+  get containsSelected() {
+    // Returns TRUE if this is a "deep link" comprising only a selected
+    // link.
+    return (this.deep_links.length === 1 && this.deep_links[0].selected);
   }
 
   containsPoint(x, y) {

@@ -178,6 +178,7 @@ class GUIController {
     this.dbl_clicked_activity = null;
     this.target_activity = null;
     this.link_under_cursor = null;
+    this.deep_link_info = '';
     this.from_connector = null;
     this.from_activity = null;
     this.to_connector = null;
@@ -498,6 +499,11 @@ class GUIController {
     }
     return pan1.length - pan2.length;
   }
+  
+  linkIdentifier(from_a, to_a, to_c) {
+    // NOTE: A link ID has THREE underscores between its node IDs.
+    return from_a.code + '___' + circledLetter(to_c) + to_a.code;
+  }
 
   nameToID(name) {
     // Return a name in lower case with link arrow replaced by three
@@ -798,9 +804,22 @@ class GUIController {
     document.addEventListener('keydown', (event) => UI.checkModals(event));
   }
   
-  setLinkUnderCursor(c) {
-    // Sets link under cursor (if any).
-    this.link_under_cursor = c;
+  setLinkUnderCursor(l) {
+    // Set link under cursor (if any).
+    this.link_under_cursor = l;
+    this.deep_link_info = '';
+  }
+  
+  showDeepLinksUnderCursor(l) {
+    // Show links represented by a thick arrow on the status line.
+    const n = l.deep_links.length;
+    if(n < 2) return;
+    const html = [];
+    for(let i = 0; i < n; i++) {
+      html.push(l.deep_links[i].displayName);
+    }
+    this.deep_link_info = l.displayName +
+        ` <em>represents ${n} links:</em> ${html.join(', ')}`;
   }
   
   setAspectUnderCursor(event) {
@@ -811,12 +830,14 @@ class GUIController {
     }
     this.aspect_under_cursor = MODEL.objectByID(t.dataset.id);
     this.aspect_link_under_cursor = MODEL.objectByID(t.dataset.linkid);
+    this.aspect_ddl_id = t.dataset.ddlid;
   }
   
   clearAspectUnderCursor() {
     // Clears aspect under cursor.
     this.aspect_under_cursor = null;
     this.aspect_link_under_cursor = null;
+    this.aspect_ddl_id = '';
   }
   
   updateControllerDialogs(letters) {
@@ -1265,9 +1286,9 @@ class GUIController {
     let con = c,
         asp = c.dataset.aspect,
         act = MODEL.activityByID(c.dataset.id);
-    c.onmouseover = connectorMouseOver;
-    c.onmouseout = connectorMouseOut;
-    c.onmousedown = connectorMouseDown;
+    con.onmouseover = connectorMouseOver;
+    con.onmouseout = connectorMouseOut;
+    con.onmousedown = connectorMouseDown;
     
     function connectorMouseOver() {
       // Do not respond when connecting from the same activity, or when
@@ -1281,6 +1302,7 @@ class GUIController {
         con.style.stroke = 'Blue';
         con.style.strokeWidth = 2;
         con.style.fill = UI.color.active_fill;
+        con.nextSibling.style.fill = 'Navy';
         if(UI.from_connector && UI.from_activity) {
           UI.to_connector = con;
           UI.to_activity = act;
@@ -1292,11 +1314,15 @@ class GUIController {
     }
 
     function connectorMouseOut() {
-      // De-highlight connector unless it is the FROM-connector.
-      if(con !== UI.from_connector) {
+      // De-highlight connector unless it is the FROM-connector; then
+      // draw the letter in dark blue. The background will be...
+      if(con === UI.from_connector) {
+        con.nextSibling.style.fill = 'Navy';
+      } else {
         con.style.stroke = UI.color.rim;
         con.style.strokeWidth = 0.75;
-        con.style.fill = 'white';
+        con.style.fill = con.dataset.bg;
+        con.nextSibling.style.fill = con.dataset.fg;
       }
       UI.to_connector = null;
       UI.to_activity = null;
@@ -1389,11 +1415,13 @@ class GUIController {
     if(ctm.fcon) {
       ctm.fcon.style.stroke = this.color.rim;
       ctm.fcon.style.strokeWidth = 0.75;
-      ctm.fcon.style.fill = 'white';
+      ctm.fcon.style.fill = ctm.fcon.dataset.bg;
+      ctm.fcon.nextSibling.style.fill = ctm.fcon.dataset.fg;
     }
     if(ctm.tcon) {
       ctm.tcon.style.stroke = UI.color.rim;
-      ctm.tcon.style.fill = 'white';
+      ctm.tcon.style.fill = ctm.tcon.dataset.bg;
+      ctm.tcon.nextSibling.style.fill = ctm.tcon.dataset.fg;
       ctm.tcon.style.strokeWidth = 0.75;
     }
     // Only add the connection when it is fully specified. If not, the
@@ -1404,6 +1432,7 @@ class GUIController {
         // Connection with an invisible sub-activity.
         // @@@ TO DO: Draw compound link.
         UI.notify(`Added link: ${l.displayName}`);
+        UI.paper.drawModel(MODEL);
       } else {
         // Normal connection between visible activities
         // NOTE: Draw link with both nodes, as they may change from
@@ -1691,7 +1720,7 @@ class GUIController {
       DOCUMENTATION_MANAGER.update(MODEL, e.shiftKey);
     } else {
       cr = 'default';
-      this.setMessage('');
+      this.setMessage(this.deep_link_info);
     }
     // When dragging selection that contains an activity, change cursor to
     // indicate that selected activities will be moved into the target.

@@ -175,6 +175,12 @@ td > img {
   width: 100%;
 }
 
+span.extra {
+  color: gray;
+  font-style: italic;
+  margin-left: 10px;
+}
+
 #recall-btn {
   min-width: 14px;
   background-image: url(images/info.png);

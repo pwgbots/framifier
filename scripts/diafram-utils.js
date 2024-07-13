@@ -319,8 +319,8 @@ function patternList(str) {
 function patternMatch(str, patterns) {
   // Returns TRUE when `str` matches the &|^-pattern.
   // NOTE: If a pattern starts with equals sign = then `str` must
-  // equal the rest of the pattern to match; if it starts with a tilde
-  // ~ then `str` must start with the rest of the pattern to match.
+  // equal the rest of the pattern to match; if it starts with a dot
+  // . then `str` must start with the rest of the pattern to match.
   for(let i = 0; i < patterns.length; i++) {
     const p = patterns[i];
     // NOTE: `p` is an OR sub-pattern that tests for a set of "plus"
@@ -333,7 +333,7 @@ function patternMatch(str, patterns) {
       pm = p.plus[j];
       if(pm.startsWith('=')) {
         match = (str === pm.substring(1));
-      } else if(pm.startsWith('~')) {
+      } else if(pm.startsWith('.')) {
         match = str.startsWith(pm.substring(1));
       } else {
         match = (str.indexOf(pm) >= 0);
@@ -349,7 +349,7 @@ function patternMatch(str, patterns) {
         res = res.join('(\\d+|\\?\\?)');
         if(pm.startsWith('=')) {
           res = '^' + res + '$';
-        } else if(pm.startsWith('~')) {
+        } else if(pm.startsWith('.')) {
           res = '^' + res;
         }
         re = new RegExp(res, 'g');

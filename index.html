@@ -368,7 +368,7 @@ and move the cursor over the status bar">
           <td style="padding:0px">
             <div id="settings-block-arrows" class="box clear"></div>
           </td>
-          <td style="padding-bottom:4px">Show hidden flows as block arrows</td>
+          <td style="padding-bottom:4px">Show links from/to contextual functions</td>
         </tr>
         <tr>
           <td style="padding:0px">
@@ -536,8 +536,12 @@ and move the cursor over the status bar">
       <input id="finder-filter-text" type="text"
              placeholder="(name filtering pattern)"
              title="Pattern may contain logical & (AND), | (OR) and ^ (NOT)
+Pattern is sensitive to upper and lower case.
+Start pattern with . to match with first part of a name.
+Start pattern with = for an exact match. 
 Limit search by starting with a type selector X?
-where X can be one or several of these letters: AFLS">
+where X can be one or several of these letters: AFLS
+(Actor, Function, Link or System aspect.">
     </div>
     <div id="finder-scroll-area">
       <table id="finder-table">

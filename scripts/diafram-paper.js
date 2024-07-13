@@ -185,21 +185,34 @@ class Shape {
     return el;
   }
   
-  addConnector(x, y, l, id) {
-    // Add a connector circle with the letter `l` 
-    // NOTE: the ID of the owner of this shape (activity) is passed as
-    // data attribute so that the SVG element "knows" for which activity
-    // the aspect must be displayed. The `aspect` data attribute is also
-    // set to the letter `l`.
+  addConnector(x, y, cl, id, ctxl) {
+    // Add a connector circle with the letter `l`.
+    // NOTES:
+    // (1) The ID of the owner of this shape (activity) is passed as a
+    //     data attribute `id` so that the SVG element "knows" for which
+    //     activity the aspect must be displayed.
+    // (2) The `aspect` data attribute is likewise set to the connector
+    //     letter `cl`.
+    // (3) The contextual links for this connector are passed by the list
+    //     `ctxl`. If this list is not empty, the connector is displayed
+    //     white-on-dark gray, and a mouseover event is added.
+    let fg = 'black',
+        bg = 'white',
+        n = ctxl.length;
+    if(n) {
+      fg = 'white';
+      bg = '#707080';
+    }
     const c = this.addCircle(x, y, 7,
-        {fill: 'white', stroke: UI.color.rim, 'stroke-width': 0.75,
-            'data-id': id, 'data-aspect': l});
-    this.addText(x, y, l, {'fill': 'black', 'font-size': 7,
-        'data-id': id, 'data-aspect': l});
+        {fill: bg, stroke: UI.color.rim, 'stroke-width': 0.75,
+            'data-id': id, 'data-aspect': cl, 'data-bg': bg,
+            'data-fg': fg, 'data-n': n});
+    this.addText(x, y, cl, {'fill': fg, 'font-size': 7,
+        'data-id': id, 'data-aspect': cl});
     // Make SVG elements responsive to cursor event.
     c.setAttribute('pointer-events', 'auto');
     // Only the Output connector can be a tail connector.
-    if(l === 'O') c.setAttribute('cursor', 'pointer');
+    if(cl === 'O') c.setAttribute('cursor', 'pointer');
     UI.connector(c);
     return this.element;
   }
@@ -224,6 +237,10 @@ class Paper {
     this.width = 200;
     this.zoom_factor = 1;
     this.zoom_label = document.getElementById('zoom');
+    // Deep links are drawn but not model entities that will be redrawn,
+    // so maintain a lookup object to clear their shapes when the model
+    // is redrawn.
+    this.drawn_deep_links = {};
     // Initialize colors used when drawing the model diagram
     this.palette = {
       // Selected model elements are bright red
@@ -339,9 +356,9 @@ class Paper {
     id = 'a_c_t_i_v_e__c_h_e_v_r_o_n__t_i_p__ID*';
     this.active_chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 7, this.palette.at_process_ub);
-    id = 'b_l_a_c_k__c_h_e_v_r_o_n__t_i_p__ID*';
-    this.black_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 6, 'black');
+    id = 'd_e_e_p__c_h_e_v_r_o_n__t_i_p__ID*';
+    this.deep_chevron = `url(#${id})`;
+    this.addMarker(defs, id, chev, 10, 'rgb(128, 128, 144)');
     id = 'o_p_e_n__w_e_d_g_e__t_i_p__ID*';
     this.open_wedge = `url(#${id})`;
     this.addMarker(defs, id, wedge, 9, this.palette.rim);
@@ -827,15 +844,45 @@ class Paper {
   // Diagram-drawing method draws the diagram for the focal cluster
   //
   
+  removeDeepLinkShapes() {
+    // Remove shapes of "deep link" objects from the paper.
+    for(let k in this.drawn_deep_links) {
+      if(this.drawn_deep_links.hasOwnProperty(k)) {
+        this.drawn_deep_links[k].shape.removeFromDOM();
+      }
+    }
+    this.drawn_deep_links = {};
+  }
+  
+  comprisingDeepLink(l) {
+    // Return drawn deep link that comprises `l`. 
+    for(let k in this.drawn_deep_links) {
+      if(this.drawn_deep_links.hasOwnProperty(k)) {
+        const dl = this.drawn_deep_links[k];
+        for(let i = 0; i < dl.deep_links.length; i++) {
+          if(dl.deep_links[i] === l) return dl;
+        }
+      }
+    }
+    return null;
+  }
+  
   drawModel(mdl) {
-    // Draw the diagram for the focal cluster.
+    // Draw the diagram for the focal activity.
     this.clear();
-    // Prepare to draw all elements in the focal cluster.
+    // Prepare to draw all elements in the focal sctivity.
     const
         fa = mdl.focal_activity,
-        vl = fa.visibleLinks;
+        vl = fa.visibleLinks,
+        dvl = fa.deepVisibleLinks;
     for(let i = 0; i < fa.sub_activities.length; i++) {
       this.drawActivity(fa.sub_activities[i]);
+    }
+    // NOTE: The "deep visible links" are "virtual" link objects that
+    // will be recognized as such by the link drawing routine. The are
+    // drawn first because their lines will be thicker.
+    for(let k in dvl) if(dvl.hasOwnProperty(k)) {
+      this.drawLink(dvl[k]);
     }
     for(let i = 0; i < vl.length; i++) {
       this.drawLink(vl[i]);
@@ -859,19 +906,23 @@ class Paper {
       const obj = mdl.selection[i];
       // Links are drawn separately, so do not draw those contained in
       // the selection .
-      if(!(obj instanceof Link)) {
-        UI.drawObject(obj, dx, dy);
-      }
+      if(!(obj instanceof Link)) UI.drawObject(obj, dx, dy);
     }
-    // Redraw all links that are visible in the focal activity.
+    // First redraw all deep links that are visible in the focal activity.
+    this.removeDeepLinkShapes();
+    const dvl = mdl.focal_activity.deepVisibleLinks;
+    for(let k in dvl) if(dvl.hasOwnProperty(k)) {
+      this.drawLink(dvl[k], dx, dy);
+    }
+    // Then also redraw all links that are visible in the focal activity.
     const vl = mdl.focal_activity.visibleLinks;
     for(let i = 0; i < vl.length; i++) {
-      this.drawLink(vl[i]);
+      this.drawLink(vl[i], dx, dy);
     }
     this.extend(); 
   }
-
-  drawLink(l) {
+  
+  drawLink(l, dx=0, dy=0) {
     // Draws link `l` on the paper.
     let stroke_color,
         stroke_width,
@@ -884,8 +935,16 @@ class Paper {
         // Link is dashed when it has no assiciated aspects.
         sda = (l.aspects.length ? 'none' : UI.sda.dash);
     // Double-check: do not draw unless both activities are visible.
-    if(!vn[0] || !vn[1]) return;
-    if(l.selected) {
+    if(!vn[0] || !vn[1]) {
+      const cdl = this.comprisingDeepLink(l);
+      if(cdl) {
+        l = cdl;
+      } else {
+        console.log('ANOMALY: no cdl found for link', l.displayName);
+        return;
+      }
+    }
+    if(l.selected || l.containsSelected) {
       // Draw arrow line thick and in red.
       stroke_color = this.palette.select;
       stroke_width = 1.75;
@@ -904,24 +963,24 @@ class Paper {
         pi3 = Math.PI / 3,
         angle = 'ORPITC'.indexOf(tc) * pi3,
         hsr3 = Math.sqrt(3) / 2,
-        cx1 = fa.x + fa.width * 0.55,
-        cy1 = fa.y,
+        cx1 = fa.x + dx + fa.width * 0.55,
+        cy1 = fa.y + dy,
         r = ta.width * 0.55,
         cosa = Math.cos(angle),
         sina = Math.sin(angle),
-        cx2 = ta.x + cosa * r,
-        cy2 = ta.y + sina * r,
-        dx = cx2 - cx1,
-        dy = cy2 - cy1,
-        dr = 10 + Math.sqrt(dx * dx + dy * dy) / 8;
+        cx2 = ta.x + dx + cosa * r,
+        cy2 = ta.y + dy + sina * r,
+        dcx = cx2 - cx1,
+        dcy = cy2 - cy1,
+        dr = 10 + Math.sqrt(dcx * dcx + dcy * dcy) / 8;
     // Declare variables for the arrow point coordinates.
     let x1, y1, x2, y2, fcx, fcy, tcx, tcy;
     // Control point for (O) connector follows the straight line to the
     // other connector up to +/- 30 degrees.
     const
-        fpm60 = Math.abs(dy) <= Math.abs(dx) / hsr3 * 0.5,
-        fcpa = (dx > 0 && fpm60 ? Math.atan(dy / dx) :
-            Math.sign(dy) * pi3 * 0.5),
+        fpm60 = Math.abs(dcy) <= Math.abs(dcx) / hsr3 * 0.5,
+        fcpa = (dcx > 0 && fpm60 ? Math.atan(dcy / dcx) :
+            Math.sign(dcy) * pi3 * 0.5),
         fcpsin = Math.sin(fcpa),
         fcpcos = Math.cos(fcpa); 
     x1 = cx1 + 8 * fcpcos;
@@ -929,51 +988,80 @@ class Paper {
     fcx = cx1 + dr * fcpcos;
     // NOTE: Pull more up or down when TO lies left of FROM; otherwise
     // stay a bit more horizontal so that line becomes a bit curved.
-    const udy = (dx < 0 ? Math.sign(dy) * (dr + 50) : - 0.5 * dr * fcpsin);
+    const udy = (dcx < 0 ? Math.sign(dcy) * (dr + 50) : - 0.5 * dr * fcpsin);
     fcy = cy1 + dr * fcpsin + udy;
     // Likewise, the control point for the TO connector follows the
     // straight line up to +/- 60 degrees of its default angle.
     const
-        slatan = (dx ? Math.atan(-dy / dx) : Math.PI / 2),
-        slangle = (dx > 0 ? Math.PI - slatan :
-            (dy < 0 ? -slatan : 2 * Math.PI - slatan)),
+        slatan = (dcx ? Math.atan(-dcy / dcx) : Math.PI / 2),
+        slangle = (dcx > 0 ? Math.PI - slatan :
+            (dcy < 0 ? -slatan : 2 * Math.PI - slatan)),
         da = angle - slangle,
         to_i = tc === 'I',
-        part = (to_i && dx > 0 ? 0.5 : 1),
+        part = (to_i && dcx > 0 ? 0.5 : 1),
         tpm60 = Math.abs(da) < pi3 * part,
         rot = ('TC'.indexOf(tc) >= 0 ? -1 :  1),
         tcpa = (tpm60 ? slangle :
-            angle + (to_i ? Math.sign(dy) * part : Math.sign(dx)) * pi3 * rot),
+            angle + (to_i ? Math.sign(dcy) * part : Math.sign(dcx)) * pi3 * rot),
         tcpsin = Math.sin(tcpa),
         tcpcos = Math.cos(tcpa);
     x2 = cx2 + tcpcos * 11;
     y2 = cy2 + tcpsin * 11;
     tcx = cx2 + tcpcos * dr;
-    tcy = cy2 + tcpsin * dr + (to_i && dx < 0 ? dr - Math.sign(dy) * 50 : 0);
+    tcy = cy2 + tcpsin * dr + (to_i && dcx < 0 ? dr - Math.sign(dcy) * 50 : 0);
     // First draw a thick but near-transparent line so that the mouse
     // events is triggered sooner.
-    const le = l.shape.addPath(
-        [`M${x1},${y1}C${fcx},${fcy},${tcx},${tcy},${x2},${y2}`],
-        {fill: 'none', stroke: 'white', 'stroke-width': 9,
-            'stroke-linecap': 'round', opacity: 0.01});
-      le.setAttribute('pointer-events', 'auto');
-      le.addEventListener('mouseover',
-          () => { UI.setLinkUnderCursor(l); });
-      le.addEventListener('mouseout',
-          () => { UI.setLinkUnderCursor(null); });
+    const
+        le = l.shape.addPath(
+            [`M${x1},${y1}C${fcx},${fcy},${tcx},${tcy},${x2},${y2}`],
+            {fill: 'none', stroke: 'white', 'stroke-width': 9,
+                'stroke-linecap': 'round', opacity: 0.01}),
+        ndl = l.deep_links.length,
+        luc = (ndl === 1 ? l.deep_links[0] : l),
+        // Permit selecting a single deep link...
+        sluc = (ndl < 2 ?
+            () => { UI.setLinkUnderCursor(luc); } :
+            // ... and make multiple deep links appear on the status line.
+            () => { UI.showDeepLinksUnderCursor(l); });
+    le.setAttribute('pointer-events', 'auto');
+    le.addEventListener('mouseover', sluc);
+    le.addEventListener('mouseout',
+        () => { UI.setLinkUnderCursor(null); });
 /*
     // Display control points (for testing & debugging).
     l.shape.addCircle(fcx, fcy, 2, {fill: 'red'});
     l.shape.addCircle(tcx, tcy, 2, {fill: 'blue'});
 */
+    // Add shape to list of drawn deep links if applicable.
+    if(ndl) this.drawn_deep_links[l.identifier] = l;
     // Then draw the line in its appropriate style.
+    let opac = 1;
+    if(ndl > 1) {
+      // NOTE: Deep links representing multiple links cannot be selected,
+      // so they are always depicted in gray.
+      // @@@ TO DO: Use color when active.
+      stroke_width = 2.5;
+      stroke_color = '#808090';
+      chev = this.deep_chevron;
+      opac = 0.75;
+      // @@@ set onmouseover and mouseout so that it displays its links.
+    }
     l.shape.addPath(
         [`M${x1},${y1}C${fcx},${fcy},${tcx},${tcy},${x2},${y2}`],
         {fill: 'none', stroke: stroke_color, 'stroke-width': stroke_width,
             'stroke-dasharray': sda, 'stroke-linecap': 'round',
-            'marker-end': chev, opacity: 1});
+            'marker-end': chev, opacity: opac});
     if(l.aspects.length) {
       const
+          firstRealLinkWithAspect = (a) => {
+              if(ndl) {
+                for(let i = 0; i < ndl; i++) {
+                  const dl = l.deep_links[i];
+                  if(dl.aspects.indexOf(a) >= 0) return dl;
+                }
+              }
+              return l;
+            },
           sauc = (event) => { UI.setAspectUnderCursor(event); },
           cauc = () => { UI.clearAspectUnderCursor(); },
           n = l.aspects.length,
@@ -982,6 +1070,7 @@ class Paper {
       for(let i = 0; i < n; i++) {
         const
             a = l.aspects[i],
+            frlwa = firstRealLinkWithAspect(a),
             aid = a.identifier,
             bp = this.bezierPoint(
                 [x1, y1], [fcx, fcy], [tcx, tcy], [x2, y2], p),
@@ -996,10 +1085,14 @@ class Paper {
         le.setAttribute('style',
             'text-shadow: 0.5px 0.5px white, -0.5px -0.5px white, ' +
                 '0.5px -0.5px white, -0.5px 0.5px white' + nimbus);
-        // Add identifying data attribute.
+        // Add identifying data attribute...
         le.setAttribute('data-id', aid);
-        // Add identifying data attribute for the link as well.
-        le.setAttribute('data-linkid', l.identifier);
+        // ... also for the link...
+        le.setAttribute('data-linkid', frlwa.identifier);
+        // ... and for a deep link the index in the drawn list, because
+        // this will permit redrawing this link after selecting and/or
+        // editing this aspect.
+        if(ndl) le.setAttribute('data-ddlid', l.identifier);
         // Make aspect text responsive to cursor events...
         le.setAttribute('pointer-events', 'auto');
         le.addEventListener('mouseover', sauc);
@@ -1072,13 +1165,16 @@ class Paper {
     // Add the six aspect circles.
     const
         letters = 'ORPITC',
-        aid = act.identifier;
+        aid = act.identifier,
+        // Get lookup object for contextual links for this activity.
+        cl = act.contextualLinks;
     for(let i = 0; i < 6; i++) {
       const
+          c = letters.charAt(i),
           a = Math.PI * i / 3,
           ax = x + Math.cos(a) * hw * 1.1,
           ay = y + Math.sin(a) * hw * 1.1;
-      act.shape.addConnector(ax, ay, letters.charAt(i), aid);
+      act.shape.addConnector(ax, ay, c, aid, cl[c]);
     }
     // Always draw process name plus actor name (if any).
     const

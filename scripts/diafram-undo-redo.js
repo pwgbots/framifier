@@ -49,8 +49,8 @@ class UndoEdit {
   }
   
   get fullAction() {
-    // Returns a string that reflects this edit action
-    // If the identifier is set, return the action followed by the class name
+    // Return a string that reflects this edit action.
+    // If the identifier is set, return the action followed by the class name 
     // of the object. NOTE: `obj` should then not be NULL, but check anyway
     if(this.action === 'drop' || this.action == 'lift') {
       return `Move ${pluralS(this.properties.length, 'function')} to function ` +
@@ -246,13 +246,18 @@ class UndoStack {
   }
   
   restoreFromXML(xml) {
-    // Restore deleted objects from XML and add them to the UndoEdit's selection
-    // (so that they can be RE-deleted)
+    // Restore deleted objects from XML and add them to the UndoEdit's
+    // selection (so that they can be RE-deleted).
     // NOTES:
     // (1) Store focal activity, because this may change while initializing
-    //     an activity from XML
-    // (2) Set "selected" attribute of objects to FALSE, as the selection will
-    //     be restored from UndoEdit
+    //     an activity from XML.
+    // (2) Set "selected" attribute of objects to FALSE, as the selection
+    //     will be restored from UndoEdit.
+    // (3) Keep track of a restored aspect, because this must be selected
+    //     after completing the undo.
+    let ra = null,
+        ral = null;
+    MODEL.orphan_list.length = 0;
     const n = parseXML(MODEL.xml_header + `<edits>${xml}</edits>`);
     if(n && n.childNodes) {
       let c,
@@ -265,37 +270,53 @@ class UndoStack {
           const obj = MODEL.addNote(c);
           obj.selected = false;
         } else if(c.nodeName === 'activity') {
-          const obj = MODEL.addActivity(xmlDecoded(nodeContentByTag(c, 'name')),
-            xmlDecoded(nodeContentByTag(c, 'owner')), c);
+          const obj = MODEL.addActivity(
+              xmlDecoded(nodeContentByTag(c, 'name')),
+              xmlDecoded(nodeContentByTag(c, 'owner')), c);
           obj.selected = false;
-        // ... but merely collect indices of other entities.
-        } else if(c.nodeName === 'link') {
+        } else if(c.nodeName === 'aspect') {
+          // Add aspect without specifying a link.
+          MODEL.addAspect(xmlDecoded(nodeContentByTag(c, 'name')),
+              null, c);
+        // ... but merely collect indices of link-related nodes to save
+        // the effort to iterate over ALL childnodes again.
+        } else if(c.nodeName.startsWith('link')) {
           li.push(i);
         }
       }
-      // NOTE: collecting the indices of links saves the effort to iterate
-      // over ALL childnodes again.
+      // Re-establish activity hierarchy.
+      MODEL.rescueOrphans();  
       for(let i = 0; i < li.length; i++) {
         c = n.childNodes[li[i]];
-        // Double-check that this node defines a link.
+        // Double-check that this node relates to a link.
         if(c.nodeName === 'link') {
-          let name = xmlDecoded(nodeContentByTag(c, 'from-name'));
-          let actor = xmlDecoded(nodeContentByTag(c, 'from-owner'));
-          if(actor != UI.NO_ACTOR) name += ` (${actor})`;
-          let fn = MODEL.nodeBoxByID(UI.nameToID(name));
-          if(fn) {
-            name = xmlDecoded(nodeContentByTag(c, 'to-name'));
-            actor = xmlDecoded(nodeContentByTag(c, 'to-owner'));
-            if(actor != UI.NO_ACTOR) name += ` (${actor})`;
-            let tn = MODEL.nodeBoxByID(UI.nameToID(name));
-            if(tn) {
-              MODEL.addLink(fn, tn, c).selected = false;
-            }
+          const
+              fc = nodeContentByTag(c, 'from-code'),
+              fa = MODEL.activityByCode(fc),
+              tc = nodeContentByTag(c, 'to-code'),
+              ta = MODEL.activityByCode(tc);
+          if(fa && ta) {
+            MODEL.addLink(fa, ta, nodeParameterValue(c, 'connector'), c)
+                .selected = false;
+          } else {
+            console.log('ERROR: Failed to add link from', fc, 'to', tc);
+          }
+        } else if(c.nodeName === 'link-aspect') {
+          const
+              a = MODEL.aspectByCode(nodeParameterValue(c, 'code')),
+              l = MODEL.linkByID(nodeParameterValue(c, 'link'));
+          if(a && l) {
+            ra = MODEL.addAspect(a.name, l);
+            ral = l;
+          } else {
+            console.log('ANOMALY: Failed to restore aspect on link', c);
           }
         }
       }
     }
     MODEL.clearSelection();
+    // Select the link asect only now (after clearing the selection).
+    if(ra && ral) MODEL.selectAspect(ra, ral);
   }
   
   undo() {
@@ -338,7 +359,7 @@ class UndoStack {
           } else if(ot === 'Note') {
             MODEL.focal_activity.deleteNote(obj);
           } else if(ot === 'Activity') {
-            MODEL.deleteNode(obj);
+            MODEL.deleteActivity(obj);
           }
           // Clear the model's selection, since we've bypassed the regular
           // `deleteSelection` routine
@@ -348,10 +369,11 @@ class UndoStack {
         }
       } else if(ue.action === 'delete') {
         this.restoreFromXML(ue.xml);
-        // Restore the selection as it was at the time of the "delete" action
-        MODEL.selectList(ue.getSelection);
+        // Restore the selection as it was at the time of the "delete"
+        // action *unless* a link aspect has been restored. 
+        if(!MODEL.selected_aspect) MODEL.selectList(ue.getSelection);
         // Clear the XML (not useful for REDO delete)
-        ue.xml = null;   
+        ue.xml = '';
         this.redoables.push(ue);
       } else if(ue.action === 'drop' || ue.action === 'lift') {
         // Restore the selection as it was at the time of the action
@@ -410,11 +432,18 @@ class UndoStack {
         re.object_id = re.properties[1];
         this.undoables.push(re);
       } else if(re.action === 'delete') {
-        // Restore the selection as it was at the time of the "delete" action
-        MODEL.selectList(re.getSelection);
-        this.undoables.push(re);
-        // Then perform a delete action
-        MODEL.deleteSelection();
+        // Check for deletion of an aspect.
+        if(MODEL.selected_aspect && MODEL.selected_aspect_link) {
+          this.undoables.push(re);
+          MODEL.selected_aspect.removeFromLink(MODEL.selected_aspect_link);
+        } else {
+          // If not an aspect, restore the selection as it was at the
+          // time of the "delete" action...
+          MODEL.selectList(re.getSelection);
+          this.undoables.push(re);
+          // ... and then perform a delete action.
+          MODEL.deleteSelection();
+        }
       } else if(re.action === 'drop' || re.action === 'lift') {
         const a = MODEL.objectByID(re.object_id);
         if(a instanceof Activity) MODEL.dropSelectionIntoActivity(a);
