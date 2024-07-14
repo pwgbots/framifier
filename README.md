@@ -3,7 +3,7 @@
 
 ### A graphical editor and simulation tool in support of the Functional Resonance Analysis Method
 
-Inspired by my first discussion with Adrie Adriaensen, I recyled and adapted a significant part
+Inspired by my first discussion with Arie Adriaensen, I recyled and adapted a significant part
 of my Linny-R software to rapidly prototype a diagramming tool for FRAM -- hence the name diaFRAM.
 
 I intend to develop it further so that it will perform a dynamic simulation that is

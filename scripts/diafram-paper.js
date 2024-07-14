@@ -198,17 +198,24 @@ class Shape {
     //     white-on-dark gray, and a mouseover event is added.
     let fg = 'black',
         bg = 'white',
-        n = ctxl.length;
+        n = ctxl.length,
+        ctxlids = ctxl.map((l) => l.identifier).join(';');
     if(n) {
       fg = 'white';
-      bg = '#707080';
+      bg = '#9090a0';
+      // Feedback link(s) are indicated by a black background.
+      for(let i = 0; i < n; i++) {
+        if(ctxl[i].is_feedback) {
+          bg = 'black';
+          break;
+        }
+      }
     }
     const c = this.addCircle(x, y, 7,
         {fill: bg, stroke: UI.color.rim, 'stroke-width': 0.75,
             'data-id': id, 'data-aspect': cl, 'data-bg': bg,
-            'data-fg': fg, 'data-n': n});
-    this.addText(x, y, cl, {'fill': fg, 'font-size': 7,
-        'data-id': id, 'data-aspect': cl});
+            'data-fg': fg, 'data-lids': ctxlids});
+    this.addText(x, y, cl, {'fill': fg, 'font-size': 7});
     // Make SVG elements responsive to cursor event.
     c.setAttribute('pointer-events', 'auto');
     // Only the Output connector can be a tail connector.
@@ -353,9 +360,9 @@ class Paper {
     id = 'c_o_n_n_e_c_t_i_n_g__c_h_e_v_r_o_n__t_i_p__ID*';
     this.connecting_chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 10, this.palette.active_rim);
-    id = 'a_c_t_i_v_e__c_h_e_v_r_o_n__t_i_p__ID*';
-    this.active_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 7, this.palette.at_process_ub);
+    id = 'f_e_e_d_b_a_c_k__c_h_e_v_r_o_n__t_i_p__ID*';
+    this.feedback_chevron = `url(#${id})`;
+    this.addMarker(defs, id, chev, 8, 'rgb(0, 0, 0)');
     id = 'd_e_e_p__c_h_e_v_r_o_n__t_i_p__ID*';
     this.deep_chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 10, 'rgb(128, 128, 144)');
@@ -951,9 +958,14 @@ class Paper {
       chev = this.selected_chevron;
       ady = 4;
     } else {
-      stroke_color = this.palette.rim;
       stroke_width = 1.25;
-      chev = this.chevron;
+      if(l.is_feedback || l.containsFeedback) {
+        stroke_color = 'black';
+        chev = this.feedback_chevron;
+      } else {
+        stroke_color = this.palette.rim;
+        chev = this.chevron;
+      }
       ady = 3;
     }
     const
@@ -1135,6 +1147,7 @@ class Paper {
     if(MODEL.focal_activity.sub_activities.indexOf(act) < 0) return;
     // Set local constants and variables.
     const
+        background = act.isBackground,
         x = act.x + dx,
         y = act.y + dy,
         hw = act.width / 2,
@@ -1142,7 +1155,7 @@ class Paper {
         qw = hw / 2;
     let stroke_width = 1,
         stroke_color = this.palette.rim,
-        fill_color = (act.isBackground ? this.palette.bg_fill :
+        fill_color = (background ? this.palette.bg_fill :
             this.palette.fg_fill);
     // Being selected overrules special border properties except SDA
     if(act.selected) {
@@ -1154,6 +1167,11 @@ class Paper {
         'l', hw, ',0l', qw, ',', hh, 'l-', qw, ',', hh, 'l-', hw, ',0Z'],
         {fill: fill_color, stroke: stroke_color,
             'stroke-width': stroke_width});
+    if(background) {
+      act.shape.addPath(['M', x, ',', y, 'l', qw, ',',
+          (act.isExit ? '-' : ''), hh, 'l-', hw, ',0Z'],
+          {fill: 'white', opacity: 0.6});
+    }
     // Draw inner shadow if activity has sub_activities.
     if(!act.isLeaf) {
       act.shape.addPath(['M', x - (hw-2.5), ',', y, 'l', (qw-1), ',-', (hh-2),

@@ -421,6 +421,7 @@ class diaFRAMModel {
     to_a.connections[to_c].push(l);
     this.makePredecessorLists();
     l.is_feedback = (from_a.predecessors.indexOf(to_a) >= 0);
+    if(l.is_feedback) this.cleanUpFeedbackLinks();
     return l;
   }
   
@@ -961,7 +962,6 @@ class diaFRAMModel {
     // Finally, remove link from the model
     UNDO_STACK.addXML(link.asXML);
     delete this.links[link.identifier];
-    this.cleanUpFeedbackLinks();
   }
 
   cleanUpActors() {
@@ -997,33 +997,65 @@ class diaFRAMModel {
   }
 
   makePredecessorLists() {
-    // Compose for each node its lost of predecessor nodes
-    // NOTE: first reset all lists, and unset the `visited` flags of links
+    // Compose for each node its list of predecessor nodes.
+    // NOTE: First reset all lists, and unset the `visited` flags of links.
     for(let a in this.activities) if (this.activities.hasOwnProperty(a)) {
       this.activities[a].predecessors.length = 0;
     }
     for(let l in this.links) if(this.links.hasOwnProperty(l)) {
       this.links[l].visited = false;
     }
-    // Only then compute the predecessor lists
+    // Only then compute the predecessor lists.
     for(let a in this.activities) if (this.activities.hasOwnProperty(a)) {
       this.activities[a].setPredecessors();
     }
   }
 
   cleanUpFeedbackLinks() {
-    // Reset feedback property to FALSE for links that no longer close a loop
+    // Set feedback property for all links that are part of a loop,
+    // and return TRUE when a change has occurred.
     this.makePredecessorLists();
-    for(let l in this.links) if(this.links.hasOwnProperty(l)) {
-      l = this.links[l];
-      if(l.is_feedback) {
-        l.is_feedback = (l.from_activity.predecessors.indexOf(l.to_activity) >= 0);
+    let redraw = false;
+    for(let k in this.links) if(this.links.hasOwnProperty(k)) {
+      const
+          l = this.links[k],
+          fb = l.is_feedback;
+      l.is_feedback = (l.from_activity.predecessors.indexOf(l.to_activity) >= 0);
+      redraw = redraw || (fb !== l.is_feedback);
+    }
+    if(redraw) UI.drawDiagram(this);
+  }
+  
+  get triggerSequence() {
+    // Return a lookup of lists of activities, where seq[0] holds all
+    // entry functions, seq[1] the immediate successors of thes entry
+    // functions, etc., and seq['NR'] the functions that can *not* be
+    // reached from any entry function.
+    const
+        aa = this.top_activity.leafActivities,
+        al = [],
+        seq = [];
+    let n = 0;
+    for(let i = aa.length - 1; i >= 0; i--) {
+      if(aa[i].isEntry) al.push(aa.splice(i, 1)[0]);
+    }
+    while(al.length) {
+      const pl = al.slice();
+      seq[n] = pl;
+      n++;
+      al.length = 0;
+      for(let i = aa.length - 1; i >= 0; i--) {
+        if(aa[i].hasIncomingFrom(pl)) al.push(aa.splice(i, 1)[0]);
       }
     }
+    if(aa.length) {
+      seq.unreachable = aa;
+    }
+    return seq;
   }
 
   get allExpressions() {
-    // Returns list of all Expression objects in this model
+    // Return list of all Expression objects in this model.
     const xl = [];
     for(let k in this.aspects) if(this.aspects.hasOwnProperty(k)) {
       xl.push(this.aspects[k].expression);
@@ -1756,13 +1788,43 @@ class Activity extends NodeBox {
   
   get isBackground() {
     // Return TRUE when this activity does not have at least one incoming
-    // linc and at least one output link.
+    // link and at least one output link.
+    if(this.sub_activities.length) return false;
     const l = this.countLinksInOut;
     return !l.incoming || !l.outgoing;
   }
   
+  get isEntry() {
+    // Return TRUE when this activity is an entry function.
+    if(this.sub_activities.length) return false;
+    const l = this.countLinksInOut;
+    return !l.incoming && l.outgoing;
+  }
+  
+  get isExit() {
+    // Return TRUE when this activity is an entry function.
+    if(this.sub_activities.length) return false;
+    const l = this.countLinksInOut;
+    return l.incoming && !l.outgoing;
+  }
+  
+  hasIncomingFrom(acts) {
+    // Return TRUE when this activity has an incoming link from any of
+    // the activities in list `acts`.
+    console.log('HERE hif for', this.displayName);
+    for(let i = 0; i < acts.length; i++) {
+      console.log('HERE hif', i, acts[i].displayName, acts[i].connections.O);
+      const aoc = acts[i].connections.O;
+      for(let j = 0; j < aoc.length; j++) {
+        if(aoc[j].to_activity === this) return true;
+      }
+    }
+    return false;
+  }
+  
   setPredecessors() {
-    // Recursive function to create list of all nodes that precede this one.
+    // Recursive function to create list of all activities that precede
+    // this one.
     for(let c in this.connections) if('CRPIT'.indexOf(c) >= 0) {
       for(let i = 0; i < this.connections[c].length; i++) {
         const l = this.connections[c][i];
@@ -2081,6 +2143,10 @@ class Activity extends NodeBox {
         }
       }
     }
+    // Store the result so that it can be reused when appropriate.
+    // NOTE: Use with care! It will be updated only when this activity
+    // is redrawn.
+    this.contextual_links = cl;
     return cl;
   }
   
@@ -2272,6 +2338,14 @@ class Link {
     // Returns TRUE if this is a "deep link" comprising only a selected
     // link.
     return (this.deep_links.length === 1 && this.deep_links[0].selected);
+  }
+
+  get containsFeedback() {
+    // Returns TRUE if this is a "deep link" comprising a feedback link.
+    for(let i = 0; i < this.deep_links.length; i++) {
+      if(this.deep_links[i].is_feedback) return true;
+    }
+    return false;
   }
 
   containsPoint(x, y) {

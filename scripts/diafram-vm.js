@@ -1353,6 +1353,19 @@ class VirtualMachine {
     return result;
   }
   
+  solveModel() {
+    // Perform successive "cycles" until no more changes occur.
+    // First establish the most logical function sequence.
+    const seq = MODEL.triggerSequence;
+    console.log('HERE seq');
+    for(let k in seq) if(seq.hasOwnProperty(k)) {
+      const s = seq[k];
+      for(let i = 0; i < s.length; i++) {
+        console.log('HERE', s[i].displayName);
+      }
+    }
+  }
+  
   calculateDependentVariables(block) {
     // Calculate the values of all model variables that depend on the
     // values of the decision variables output by the solver.
