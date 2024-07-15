@@ -192,36 +192,35 @@ class GUIMonitor {
         err = top.vector[t],
         // Make separate lists of variable names and their expressions
         vlist = [],
-        xlist = [];
+        xlist = [],
+        tlist = [];
     document.getElementById('call-stack-error').innerHTML =
         `ERROR at t=${t}: ` + VM.errorMessage(err);
     for(let i = 0; i < csl; i++) {
-      const
-          x = VM.call_stack[i],
-          ons = x.object.displayName + '|';
-      vlist.push(ons + x.attribute);
-      // Trim spaces around all object-attribute separators in the expression
-      xlist.push(x.text.replace(/\s*\|\s*/g, '|'));
+      const x = VM.call_stack[i];
+      vlist.push(x.object.displayName);
+      xlist.push(x.text);
+    // @@TO DO: collect name of activity for aspect in scope to display.
+      tlist.push('???');
     }
     // Highlight variables where they are used in the expressions
-    const vcc = UI.chart_colors.length;
+    const
+        cc = UI.chart_colors,
+        ncc = cc.length;
     for(let i = 0; i < xlist.length; i++) {
       for(let j = 0; j < vlist.length; j++) {
         // Ignore selectors, as these may be different per experiment
         const
-            vnl = vlist[j].split('|'),
-            sel = (vnl.length > 1 ? vnl.pop() : ''),
-            attr = (VM.attribute_names[sel] ? '|' + sel : ''),
-            vn = vnl.join() + attr,
-            vnc = '<span style="font-weight: 600; color: ' +
-                `${UI.chart_colors[j % vcc]}">${vn}</span>`;
+            vn = vlist[j],
+            vnc = `<span title="Aspect defined for: ${tlist[j]}" style=` +
+                `"font-weight: 600; color: ${cc[j % ncc]}">${vn}</span>`;
         xlist[i] = xlist[i].split(vn).join(vnc);
       }
     }
     // Then also color the variables
     for(let i = 0; i < vlist.length; i++) {
-      vlist[i] = '<span style="font-weight: 600; color: ' +
-        `${UI.chart_colors[i % vcc]}">${vlist[i]}</span>`;
+      vlist[i] = `<span  title="Aspect defined for: ${tlist[i]}" style=` +
+          `"font-weight: 600; color: ${cc[i % ncc]}">${vlist[i]}</span>`;
     }
     // Start without indentation
     let pad = 0;

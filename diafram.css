@@ -520,14 +520,25 @@ div.disab {
 #focal-activity {
   display: inline-block;
   margin-left: 50px;
+  max-height: 32px;
+  border-left: solid 1px silver;
 }
 
 #focal-name {
   font: 10pt sans-serif;
   display: inline-block;
-  max-width: 60vw;
+  max-width: calc(100vw - 735px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 4px;
   vertical-align: middle;
   cursor: pointer;
+}
+
+#focal-name::before {
+  content: '\25B6 ';
+  color: #0000c0;
 }
 
 #load-autosaved-btn {
@@ -824,6 +835,23 @@ img.inline-cancel-btn {
   cursor: pointer;
 }
 
+/* ACTORS dialog */
+#actors-dlg {
+  width: 230px;
+  height: min-content;
+}
+
+/* ACTOR dialog */
+#actor-dlg {
+  width: 250px;
+  height: 150px;
+}
+
+#color-picker {
+  position: absolute;
+  top: 26px;
+  left: 2px;
+}
 
 /* the DOCUMENTATION DIALOG displays comments and Linny-R reference */
 #documentation-dlg {
@@ -1423,5 +1451,35 @@ div.sel-tab {
   box-shadow: inset #bfc0e2 0 0 7px 2px; 
 }
 
+#call-stack-dlg {
+  width: 320px;
+  height: 250px;
+}
 
+#call-stack-error {
+  display: inline-block;
+}
+
+#call-stack-table {
+  width: calc(100% - 9px);
+  height: calc(100% - 26px);
+  margin: 2px;
+  padding-left: 4px;
+  border: solid 1px Silver;
+  background-color: White;
+  overflow: auto;
+}
+
+div.call-stack-vbl {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+div.call-stack-expr {
+  font-family: monospace;
+  font-size: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;  
+}
 

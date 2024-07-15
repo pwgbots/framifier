@@ -61,6 +61,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       MODEL = null,
       // Manager objects that will act as controller and/or viewer
       X_EDIT = null,
+      ACTOR_MANAGER = null,
       MONITOR = null,
       FILE_MANAGER = null,
       DOCUMENTATION_MANAGER = null,
@@ -98,8 +99,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         // classes are initialized before their instances are created
         loadScripts(['-config', '-model', '-paper', '-controller',
             '-monitor', '-expression-editor', '-file-manager',
-            '-model-autosaver', '-documentation-manager', 
-            '-finder', '-undo-redo', '-vm', '-utils'], t);
+            '-model-autosaver', '-documentation-manager',
+            '-actor-manager', '-finder', '-undo-redo', '-vm', '-utils'],
+                  t);
       }
     }
 
@@ -133,6 +135,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       VM = new VirtualMachine();
       // Create the GUI-only objects
       UNDO_STACK = new UndoStack();
+      ACTOR_MANAGER = new ActorManager();
       X_EDIT = new ExpressionEditor();
       FINDER = new Finder();
       // NOTE: Instantiate the GUI classes, not their superclasses
@@ -161,6 +164,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
            title="Change model settings (Alt-M)">
       <img id="save-btn" class="btn enab" src="images/save.png"
            title="Save model (Ctrl-S)">
+      <img id="actors-btn" class="btn enab" src="images/agents.png"
+           title="View agent list (Alt-A)">
       <img id="finder-btn" class="btn enab" src="images/find.png"
            title="Find model elements by their name (Ctrl-F)">
       <img id="savediagram-btn" class="btn enab" src="images/save-diagram.png"
@@ -172,11 +177,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     </div>
     <!-- if diagram is not the TOP activity, show a button to move up to its parent -->
     <div id="focal-activity">
-      <div id="focal-name"></div>
       <img id="parent-btn" class="btn enab" src="images/parent.png"
            title="View parent activity (Ctrl-U)">
       <img id="lift-btn" class="btn disab" src="images/lift.png"
            title="Move selection to parent activity">
+      <div id="focal-name"></div>
     </div>
     <!-- solver host image -->
     <div id="server-host" style="float: right">
@@ -501,6 +506,33 @@ and move the cursor over the status bar">
         <img class="cancel-btn" src="images/cancel.png">
         No
       </div>
+    </div>
+  </div>
+  
+  <!-- ACTORS dialog -->
+  <div id="actors-modal" class="modal">
+    <div id="actors-dlg" class="inp-dlg">
+      <div class="dlg-title">Agents
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <div id="actors-scroll-area">
+        <table id="actors-table" style="width: 100%">
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ACTOR dialog -->
+  <div id="actor-modal" class="modal">
+    <div id="actor-dlg" class="inp-dlg">
+      <div class="dlg-title">Agent color
+        <img class="cancel-btn" src="images/cancel.png">
+        <img class="ok-btn" src="images/ok.png">
+      </div>
+      <div id="actor-name-lbl">Name:</div>
+      <input id="actor-name" type="text" autocomplete="off">
+      <div id="color-picker"></div>
     </div>
   </div>
 

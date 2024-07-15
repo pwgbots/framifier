@@ -104,6 +104,14 @@ class GUIController {
       even_dash: '6,5',
       dot_dot: '2,3,2,6'
     };
+    this.aspect_type = {
+      'C': 'Control',
+      'O': 'Output',
+      'R': 'Resource',
+      'P': 'Precondition',
+      'I': 'Input',
+      'T': 'Time'
+    };
     // Error messages
     this.ERROR = {
         CREATE_FAILED: 'ERROR: failed to create a new SVG element',
@@ -211,7 +219,7 @@ class GUIController {
     this.node_btns = ['activity', 'note'];
     this.edit_btns = ['clone', 'paste', 'delete', 'undo', 'redo'];
     this.model_btns = ['settings', 'save', 'savediagram', 'finder',
-        'monitor', 'solve'];
+        'actors', 'monitor', 'solve'];
     this.other_btns = ['new', 'load', 'documentation',
         'parent', 'lift', 'solve', 'stop', 'reset', 'zoomin', 'zoomout',
         'stepback', 'stepforward', 'autosave', 'recall'];
@@ -236,7 +244,7 @@ class GUIController {
 
     // Initialize "main" modals, i.e., those that relate to the controller,
     // not to other dialog objects.
-    const main_modals = ['model', 'load', 'settings',
+    const main_modals = ['model', 'load', 'settings', 'actors',
         'add-activity', 'add-aspect', 'move', 'note', 'clone', 'expression'];
     for(let i = 0; i < main_modals.length; i++) {
       this.modals[main_modals[i]] = new ModalDialog(main_modals[i]);
@@ -558,6 +566,12 @@ class GUIController {
     }
   }
   
+  coloredResult(r) {
+    // Return `r` as blue number, or as red code if exceptional.
+    const clr = (Math.abs(r) >= -VM.ERROR ? '#a00000' : '#0000a0');
+    return `<span style="color: ${clr}; font-family: monospace">${VM.sig4Dig(r)}</span>`;
+  }
+  
   resetModel() {
     // Reset the Virtual Machine (clears solution). 
     VM.reset();
@@ -612,6 +626,8 @@ class GUIController {
         () => FILE_MANAGER.saveModel(event.shiftKey));
     this.buttons.savediagram.addEventListener('click',
         () => FILE_MANAGER.saveDiagramAsSVG(event.shiftKey));
+    this.buttons.actors.addEventListener('click',
+        () => ACTOR_MANAGER.showDialog());
     // NOTE: All draggable & resizable dialogs "toggle" show/hide.
     const tdf = (event) => UI.toggleDialog(event);
     this.buttons.finder.addEventListener('click', tdf);

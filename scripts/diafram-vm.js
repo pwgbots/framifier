@@ -264,7 +264,7 @@ class Expression {
     }
     return v[t];
   }
-
+  
   get asAttribute() {
     // Return the result for the current time step if the model has been
     // solved (with special values as human-readable string), or the

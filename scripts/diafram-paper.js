@@ -221,6 +221,14 @@ class Shape {
     // Only the Output connector can be a tail connector.
     if(cl === 'O') c.setAttribute('cursor', 'pointer');
     UI.connector(c);
+    if(ctxlids) {
+      // Add a mouseover event that will display context links in the
+      // documentation browser.
+      c.addEventListener('mouseover', (event) => {
+          DOCUMENTATION_MANAGER.showContextLinks(event);
+        });
+      c.addEventListener('mouseout', () => { UI.deep_link_info = ''; });
+    }
     return this.element;
   }
 

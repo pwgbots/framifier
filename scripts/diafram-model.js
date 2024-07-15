@@ -1291,6 +1291,7 @@ class Actor {
   constructor(name) {
     this.name = name;
     this.comments = '';
+    this.color = '#ffffff';
   }
 
   get type() {
@@ -1681,6 +1682,15 @@ class Aspect extends NodeBox {
             ')</span>';
     }
     return `<em>System aspect:</em> ${this.displayName}${extra}`;
+  }
+  
+  value(t) {
+    // Return the computed value of this aspect.
+    const x = this.expression;
+    if(x.defined && (x.isStatic || MODEL.solved)) {
+      return this.expression.result(t);
+    }
+    return VM.UNDEFINED;
   }
 
   setCode() {

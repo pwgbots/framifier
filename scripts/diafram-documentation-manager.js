@@ -6,7 +6,6 @@ This tool is developed by Pieter Bots at Delft University of Technology.
 This JavaScript file (diafram-documentation-manager.js) provides the GUI
 functionality for the diaFRAM model documentation manager: the draggable
 dialog that allows viewing and editing documentation text for model entities.
-
 */
 
 /*
@@ -478,6 +477,40 @@ class DocumentationManager {
       this.viewer.innerHTML = divs.join('');
       // Set the dialog title.
       this.title.innerHTML = title;
+    }
+  }
+  
+  showContextLinks(event) {
+    // Show info on contextual links of connector under cursor (if any).
+    const ds = event.target.dataset;
+    if(ds.lids) {
+      const
+          asp = UI.aspect_type[ds.aspect],
+          act = MODEL.activities[ds.id],
+          ids = ds.lids.split(';'),
+          msg = pluralS(ids.length, `more ${asp} link`) +
+              ` for function "${act.displayName}"`;
+      UI.deep_link_info = msg + (this.visible ? '' :
+          '<span class="extra">(see <img src="images/info.png" ' +
+              'style="width: 15px; height: 15px; vertical-align: bottom"> ' +
+              ' for details)</span>');
+      if(this.visible) {
+        // Add link info.
+        const
+            divs = [],
+            a2s = (a) => a.displayName +
+                (true || MODEL.solved ?
+                    ` = ${UI.coloredResult(a.value(MODEL.t))}` : '');
+        for(let i = 0; i < ids.length; i++) {
+          const
+              l = MODEL.linkByID(ids[i]),
+              al = l.aspects.map(a2s);
+          divs.push('<div>', l.displayName,
+              (al.length ? ` (${al.join(', ')})` : ''), '</div>');
+        }
+        this.viewer.innerHTML = divs.join('');
+        this.title.innerHTML = msg;
+      }
     }
   }
 
