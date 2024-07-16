@@ -244,7 +244,7 @@ class GUIController {
 
     // Initialize "main" modals, i.e., those that relate to the controller,
     // not to other dialog objects.
-    const main_modals = ['model', 'load', 'settings', 'actors',
+    const main_modals = ['model', 'load', 'settings', 'actors', 'actor',
         'add-activity', 'add-aspect', 'move', 'note', 'clone', 'expression'];
     for(let i = 0; i < main_modals.length; i++) {
       this.modals[main_modals[i]] = new ModalDialog(main_modals[i]);

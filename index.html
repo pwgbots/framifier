@@ -13,9 +13,6 @@ This HTML document (index.html) provides the browser-based GUI for
 editing and executing FRAM models. See the <head> section for required
 JavaScript files.
 
-NOTE: One of these files (iro.js) is authored by James Daniel. This
-scrip implements the elegant color picker that appears in some dialogs.
-
 The diaFRAM model editor is implemented in JavaScript and will work
 "stand-alone" in modern web browsers.
 -->
@@ -148,7 +145,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     }
     
   </script>
-  <script type="text/javascript" src="scripts/iro.min.js"></script>
 </head>
 <body onload="loadDiaFRAM();">
   <!-- header shows top menu bar -->
@@ -517,7 +513,7 @@ and move the cursor over the status bar">
         <img class="ok-btn" src="images/ok.png">
       </div>
       <div id="actors-scroll-area">
-        <table id="actors-table" style="width: 100%">
+        <table id="actors-table">
         </table>
       </div>
     </div>
@@ -526,13 +522,14 @@ and move the cursor over the status bar">
   <!-- ACTOR dialog -->
   <div id="actor-modal" class="modal">
     <div id="actor-dlg" class="inp-dlg">
-      <div class="dlg-title">Agent color
+      <div class="dlg-title">Modify agent
         <img class="cancel-btn" src="images/cancel.png">
         <img class="ok-btn" src="images/ok.png">
       </div>
       <div id="actor-name-lbl">Name:</div>
       <input id="actor-name" type="text" autocomplete="off">
-      <div id="color-picker"></div>
+      <div id="actor-color-lbl">Color:</div>
+      <input id="actor-color" type="color">
     </div>
   </div>
 

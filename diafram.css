@@ -841,16 +841,81 @@ img.inline-cancel-btn {
   height: min-content;
 }
 
-/* ACTOR dialog */
-#actor-dlg {
-  width: 250px;
-  height: 150px;
+#actors-scroll-area {
+  width: calc(100% - 5px);
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid Silver;
+  margin: 2px;
 }
 
-#color-picker {
+#actors-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#actors-table > tbody > tr {
+  height: 19px;
+}
+
+#actors-table > tbody > tr:first-child {
+  background-color: #e0e0f4;
+  pointer-events: none;
+}
+
+#actors-table > tbody > tr > td:last-child {
+  width: 37px;
+  text-align: right;
+  padding-right: 4px;}
+
+#actors-table > tbody > tr > td:nth-child(2) {
+  width: 19px;
+}
+
+#actors-table > tbody > tr > td:first-child {
+  max-width: calc(100% - 56px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#actors-table > tbody > tr > td > div {
+  height: 15px;
+  width: 15px;
+  margin: 1px;
+  border: 1px solid silver;
+  cursor: pointer;
+}
+
+/* ACTOR dialog */
+#actor-dlg {
+  width: 200px;
+  height: 70px;
+}
+
+#actor-name-lbl {
   position: absolute;
-  top: 26px;
+  top: 25px;
   left: 2px;
+}
+
+#actor-name {
+  position: absolute;
+  top: 23px;
+  left: 40px;
+}
+
+#actor-color-lbl {
+  position: absolute;
+  top: 46px;
+  left: 2px;
+}
+
+#actor-color {
+  position: absolute;
+  width: 24px;
+  height: 22px;
+  top: 45px;
+  left: 40px;
 }
 
 /* the DOCUMENTATION DIALOG displays comments and Linny-R reference */

@@ -1168,7 +1168,7 @@ class Paper {
     // Being selected overrules special border properties except SDA
     if(act.selected) {
       stroke_color = this.palette.select;
-      stroke_width = 2;
+      stroke_width = 2.5;
     }
     // Draw frame using colors as defined above.
     act.shape.addPath(['M', x - hw, ',', y, 'l', qw, ',-', hh,
@@ -1187,6 +1187,19 @@ class Paper {
           'l-', (hw-2.5), ',0Z'],
               {fill: 'none', stroke: stroke_color, 'stroke-width': 5,
                   opacity: 0.4});
+    }
+    // Add actor color unless it is white.
+    if(act.actor.color !== '#ffffff') {
+      let cd = 3,
+          cd2 = 6;
+      if(act.isLeaf) {
+        cd = 1.24;
+        cd2 = 2.5;
+      }
+      act.shape.addPath(['M', x - (hw-cd2), ',', y, 'l', (qw-cd), ',-', (hh-cd2),
+          'l', (hw-cd2), ',0l', (qw-cd), ',', (hh-cd2), 'l-', (qw-cd), ',', (hh-cd2),
+          'l-', (hw-cd2), ',0Z'],
+              {fill: 'none', stroke: act.actor.color, 'stroke-width': 4});      
     }
     // Add the six aspect circles.
     const

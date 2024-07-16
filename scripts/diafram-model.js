@@ -1310,14 +1310,25 @@ class Actor {
     return this.name;
   }
   
+  get leafCount() {
+    // Return the number of leaf activities "owned" by this actor.
+    const la = MODEL.top_activity.leafActivities;
+    let n = 0;
+    for(let i = 0; i < la.length; i++) {
+      if(la[i].actor === this) n++;
+    }
+    return n;
+  }
+  
   get asXML() {
-    return ['<actor round-flags="', this.round_flags,
+    return ['<actor color="', this.color.substring(1, 7), 
         '"><name>', xmlEncoded(this.name),
         '</name><comments>', xmlEncoded(this.comments),
         '</comments></actor>'].join('');
   }
   
   initFromXML(node) {
+    this.color = '#' + (nodeParameterValue(node, 'color') || 'ffffff');
     this.comments = nodeContentByTag(node, 'documentation');
   }
   
@@ -1342,6 +1353,7 @@ class Actor {
     MODEL.actors[a.identifier] = this;
     // Remove the old entry
     delete MODEL.actors[old_id];
+    return this;
   }
   
 } // END of class Actor
