@@ -536,14 +536,20 @@ and move the cursor over the status bar">
   <!-- EXPRESSION EDITOR dialog -->
   <div id="expression-modal" class="modal">
     <div id="expression-dlg" class="inp-dlg">
-      <div class="dlg-title">Edit system aspect
+      <div class="dlg-title">Edit <span id="expression-type">system aspect</span>
         <div id="expression-scope"></div>
         <img class="cancel-btn" src="images/cancel.png">
         <img class="ok-btn" src="images/ok.png">
         <img class="info-btn" src="images/info.png">
       </div>
-      <div id="expression-aspect-lbl">Name:</div>
-      <input id="expression-aspect" type="text" autocomplete="off">
+      <div id="expression-aspect-div">
+        <label for="expression-aspect">Name:</label>
+        <input id="expression-aspect" type="text" autocomplete="off">
+      </div>
+      <div id="expression-incoming-div">Expression for
+        <span id="expression-incoming-aspect"></span> of function
+        <span id="expression-activity"></span>
+      </div>
       <textarea id="expression-text" autocomplete="off" autocorrect="off"
                 autocapitalize="off" spellcheck="false"></textarea>
       <div id="expression-status">&nbsp;</div>

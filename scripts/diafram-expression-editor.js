@@ -36,8 +36,13 @@ class ExpressionEditor {
     this.edited_expression = null;
     // Dialog DOM elements.
     const md = UI.modals.expression;
+    this.type = md.element('type');
     this.scope = md.element('scope');
+    this.aspect_div = md.element('aspect-div');
     this.aspect = md.element('aspect');
+    this.incoming_div = md.element('incoming-div');
+    this.incoming_aspect = md.element('incoming-aspect');
+    this.activity = md.element('activity');
     this.text = md.element('text');
     this.status = md.element('status');
     this.help = md.element('help');
@@ -152,14 +157,33 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
         'mouseover', () => X_EDIT.hideVariables());
   }
 
-  editExpression(asp) {
-    // Open the dialog for the expression for aspect `asp`.
-    this.edited_object = asp;
-    this.edited_expression = asp.expression;
-    this.activity_scope = asp.parent;
-    this.scope.innerHTML = `(<em>scope:</em> ${this.activity_scope.displayName})`;
-    this.aspect.value = asp.displayName;
+  editExpression(obj, con='') {
+    // Open the dialog for the expression for aspect `obj`, or when the
+    // connector letter `con` is specified, the incoming expression of
+    // activity `obj`.
+    this.edited_object = obj;
+    this.edited_connector = con;
+    if(obj instanceof Activity && con) {
+      this.edited_expression = obj.incoming_expressions[con];
+      this.scope.innerHTML = '';
+      this.aspect.value = '';
+      this.type.innerText = circledLetter(con) + ' expression';
+      this.incoming_aspect.innerText = UI.aspect_type[con];
+      this.activity.innerText = obj.displayName;
+      this.incoming_div.style.display = 'block';
+      this.aspect_div.style.display = 'none';
+    } else {
+      this.edited_expression = obj.expression;
+      this.type.innerText = 'system aspect';
+      this.scope_connector = '';
+      this.scope.innerHTML =
+          `(<em>scope:</em> ${obj.parent.displayName})`;
+      this.aspect.value = obj.displayName;
+      this.aspect_div.style.display = 'block';
+      this.incoming_div.style.display = 'none';
+    }
     this.text.value = this.edited_expression.text.trim();
+    
     this.updateVariables();
     this.clearStatusBar();
     UI.modals.expression.show('text');
@@ -177,20 +201,22 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
     // @@TO DO: prepare for undo
     const
         md = UI.modals.expression,
-        asp = this.edited_object;
-    // Rename object if name has changed.
-    let nn = md.element('aspect').value.trim(),
-        nasp = asp.rename(nn);
-    // NOTE: When rename returns FALSE, a warning is already shown.
-    if(nasp !== true && nasp !== false) {
-      this.warningEntityExists(nasp);
-      return false;
-    }
-    // Rename was successful => diagram must be updated.
-    let l = MODEL.linksWithAspect(asp);
-    for(let i = 0; i < l.length; i++) {
-      // Redraw the shape, as its appearance may have changed.
-      UI.paper.drawLink(l[i]);
+        obj = this.edited_object;
+    // Rename object if it is an aspect and its name has changed.
+    if(obj instanceof Aspect) {
+      let nn = md.element('aspect').value.trim(),
+          nasp = obj.rename(nn);
+      // NOTE: When rename returns FALSE, a warning is already shown.
+      if(nasp !== true && nasp !== false) {
+        this.warningEntityExists(nasp);
+        return false;
+      }
+      // Rename was successful => diagram must be updated.
+      let l = MODEL.linksWithAspect(obj);
+      for(let i = 0; i < l.length; i++) {
+        // Redraw the shape, as its appearance may have changed.
+        UI.paper.drawLink(l[i]);
+      }
     }
     // Only now parse the contents of the expression editor.
     let xt = this.text.value.trim();
@@ -199,7 +225,8 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
     // Update the text shown in the editor, otherwise the position of
     // errors in the text may be incorrect.
     this.text.value = xt;
-    const xp = new ExpressionParser(xt, this.edited_object);
+    const xp = new ExpressionParser(xt, this.edited_object,
+        this.edited_connector);
     if(xp.error) {
       this.status.innerHTML = xp.error;
       this.status.style.backgroundColor = 'Yellow';
@@ -226,7 +253,9 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
     // NOTE: `edited_object` is an aspect on a link => parent is that
     // link, and FROM activty of that link defines the scope.
     const
-        ais = this.activity_scope.aspectsInScope,
+        ais = (this.edited_object instanceof Aspect ?
+            this.edited_object.parent.aspectsInScope :
+            this.edited_object.incomingAspects(this.edited_connector)),
         list = [];
     for(let i = 0; i < ais.length; i++) {
       list.push(ais[i].displayName);
@@ -236,11 +265,11 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
   
   updateVariables() {
     // Compile list of variables in scope.
-      const
-        tbl = this.variables,
-        html = [],
-        vis = this.aspectNames.sort(
-            (a, b) => UI.compareFullNames(a, b));
+    const
+      tbl = this.variables,
+      html = [],
+      vis = this.aspectNames.sort(
+          (a, b) => UI.compareFullNames(a, b));
     this.variables_in_scope = vis;
     for(let i = 0; i < vis.length; i++) {
       html.push(`<tr class="list">
@@ -255,10 +284,18 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
       this.insert.classList.remove('enab');
       this.insert.classList.add('disab');
     }
-    this.insert.title = pluralS(vis.length, 'variable') +
-        ` within scope of function "${this.activity_scope.displayName}"`;
+    this.status.title = pluralS(vis.length, 'variable') +
+        ` within scope of ${this.scopeName}`;
     // Initially hide the variable list.
     this.variables.style.display = 'none';
+  }
+  
+  get scopeName() {
+    if(this.edited_object instanceof Aspect) {
+      return `function "${this.edited_object.parent.displayName}"`;
+    }
+    return `${UI.aspect_type[this.edited_connector]} of function ` +
+        `"${this.edited_object.displayName}"`; 
   }
   
   showVariables() {

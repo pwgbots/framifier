@@ -1587,6 +1587,12 @@ class NodeBox extends ObjectWithXYWH {
     }
     // Compose the full name.
     if(actor_name === '') actor_name = UI.NO_ACTOR;
+    // Check whether the actor name does not refer to a non-actor entity.
+    const ane = MODEL.namedObjectByID(UI.nameToID(actor_name));
+    if(ane && !(ane instanceof Actor)) {
+      UI.warningEntityExists(ane);
+      return false;      
+    }
     let fn = name;
     if(actor_name != UI.NO_ACTOR) fn += ` (${actor_name})`;
     // Get the ID (derived from the full name) and check if MODEL already
@@ -1768,6 +1774,7 @@ class Activity extends NodeBox {
     super(parent, name, actor);
     this.sub_activities = [];
     this.connections = {C: [], O: [], R: [], P: [], I: [], T: [], S: []};
+    this.incoming_expressions = {};
     this.notes = [];
     this.predecessors = [];
   }
@@ -1904,7 +1911,15 @@ class Activity extends NodeBox {
         '</owner><comments>', xmlEncoded(this.comments),
         '</comments><x-coord>', this.x,
         '</x-coord><y-coord>', this.y,
-        '</y-coord><sub-activities>'];
+        '</y-coord><incoming-expressions>'];
+    for(let c in this.connections) if('CRPIT'.indexOf(c)) {
+      if(this.incoming_expressions[c]) {
+        xml.push('<incoming-x connection="', c, '">',
+            xmlEncoded(this.incoming_expressions[c].text),
+            '</incoming-x>');
+      }
+    }
+    xml.push('</incoming-expressions><sub-activities>');
     for(let i = 0; i < this.sub_activities.length; i++) {
       xml.push(`<activity-code>${this.sub_activities[i].code}</activity-code>`);
     }
@@ -1922,7 +1937,19 @@ class Activity extends NodeBox {
     this.comments = xmlDecoded(nodeContentByTag(node, 'comments'));
     this.x = safeStrToInt(nodeContentByTag(node, 'x-coord'));
     this.y = safeStrToInt(nodeContentByTag(node, 'y-coord'));
-    let n = childNodeByTag(node, 'sub-activities');
+    let n = childNodeByTag(node, 'incoming-expressions');
+    if(n && n.childNodes) {
+      for(let i = 0; i < n.childNodes.length; i++) {
+        const c = n.childNodes[i];
+        if(c.nodeName === 'incoming-x') {
+          const
+              con = nodeParameterValue(c, 'connection'),
+              txt = xmlDecoded(nodeContent(c));
+          this.incoming_expressions[con] = new Expression(this, txt);
+        }
+      }
+    }
+    n = childNodeByTag(node, 'sub-activities');
     if(n && n.childNodes) {
       for(let i = 0; i < n.childNodes.length; i++) {
         const c = n.childNodes[i];
@@ -1984,6 +2011,21 @@ class Activity extends NodeBox {
       }
     }
     return ais;
+  }
+  
+  incomingAspects(connector) {
+    // Return list of all aspects for this activity that are incoming
+    // via `connector`.
+    const
+        ia = [],
+        cc = this.connections[connector];
+    for(let i = 0; i < cc.length; i++) {
+      const la = cc[i].aspects;
+      for(let j = 0; j < la.length; j++) {
+        addDistinct(la[j], ia);
+      }
+    }
+    return ia;
   }
 
   containsActivity(a) {

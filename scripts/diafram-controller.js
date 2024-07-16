@@ -181,6 +181,7 @@ class GUIController {
     this.on_aspect = null;
     this.on_activity = null;
     this.on_note = null;
+    this.on_connector = '';
     this.dragged_node = null;
     this.activity_to_move = null;
     this.dbl_clicked_activity = null;
@@ -1305,7 +1306,12 @@ class GUIController {
     con.onmouseover = connectorMouseOver;
     con.onmouseout = connectorMouseOut;
     con.onmousedown = connectorMouseDown;
-    
+    con.addEventListener('click', (event) => {
+        UI.editIncomingExpression(event);
+      });
+    con.addEventListener('mouseover', () => {
+        
+      });
     function connectorMouseOver() {
       // Do not respond when connecting from the same activity, or when
       // trying to connect to an output.
@@ -1326,6 +1332,14 @@ class GUIController {
         if(act) {
           //DOCUMENTATION_MANAGER.showAspect(a, ca);
         }
+      } else if(act.sub_activities.length) {
+         // Incoming expressions of non-leaf activities cannot be set.
+        con.style.cursor = 'default';
+        UI.on_connector = '';
+      } else {
+        con.style.stroke = UI.color.active_rim;
+        con.style.strokeWidth = 1.5;
+        con.style.cursor = 'pointer';
       }
     }
 
@@ -1335,13 +1349,20 @@ class GUIController {
       if(con === UI.from_connector) {
         con.nextSibling.style.fill = 'Navy';
       } else {
-        con.style.stroke = UI.color.rim;
-        con.style.strokeWidth = 0.75;
+        if(con.dataset.ix === 'true') {
+          con.style.stroke = 'black';
+          con.style.strokeWidth = 1.5;
+        } else {
+          con.style.stroke = UI.color.rim;
+          con.style.strokeWidth = 0.75;
+        }
         con.style.fill = con.dataset.bg;
         con.nextSibling.style.fill = con.dataset.fg;
       }
       UI.to_connector = null;
       UI.to_activity = null;
+      UI.on_connector = '';
+      UI.deep_link_info = '';
       con.style.cursor = (asp === 'O' ? 'pointer' : 'default');
     }
 
@@ -1548,6 +1569,20 @@ class GUIController {
     }
   }
   
+  editIncomingExpression(event) {
+    // Opens expression editor for the connection under the cursor.
+    const
+        ds = event.target.dataset,
+        act = MODEL.activityByID(ds.id),
+        asp = ds.aspect;
+    if(act && asp) {
+      if(!act.incoming_expressions[asp]) {
+        act.incoming_expressions[asp] = new Expression(act, '');
+      }
+      X_EDIT.editExpression(act, asp);
+    }
+  }
+  
   
   //
   // Button functionality
@@ -1734,7 +1769,7 @@ class GUIController {
     } else if(this.on_note) {
       // When shift-moving over a note, show the model's documentation.
       DOCUMENTATION_MANAGER.update(MODEL, e.shiftKey);
-    } else {
+    } else if(!this.on_connector) {
       cr = 'default';
       this.setMessage(this.deep_link_info);
     }

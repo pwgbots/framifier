@@ -856,10 +856,12 @@ img.inline-cancel-btn {
 
 #actors-table > tbody > tr {
   height: 19px;
+  cursor: pointer;
 }
 
 #actors-table > tbody > tr:first-child {
   background-color: #e0e0f4;
+  cursor: not-allowed;
   pointer-events: none;
 }
 
@@ -883,7 +885,6 @@ img.inline-cancel-btn {
   width: 15px;
   margin: 1px;
   border: 1px solid silver;
-  cursor: pointer;
 }
 
 /* ACTOR dialog */
@@ -1088,17 +1089,31 @@ img.inline-cancel-btn {
   overflow-y: hidden;
 }
 
-#expression-aspect-lbl {
+#expression-aspect-div {
   position: absolute;
-  top: 26px;
+  top: 24px;
   left: 2px;
+  width: calc(100% - 4px);
 }
 
 #expression-aspect {
+  width: calc(100% - 40px);
+}
+
+#expression-incoming-div {
   position: absolute;
-  top: 24px;
-  right: 3px;
-  width: calc(100% - 45px);
+  top: 26px;
+  left: 2px;
+  font-style: italic;
+}
+
+#expression-incoming-aspect {
+  font-style: normal;
+}
+
+#expression-activity {
+  font-style: normal;
+  font-family: monospace;
 }
 
 #add-aspect-list,

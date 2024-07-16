@@ -199,7 +199,18 @@ class Shape {
     let fg = 'black',
         bg = 'white',
         n = ctxl.length,
+        a = MODEL.activities[id],
+        incx = a.incoming_expressions[cl],
+        incxd = (incx && incx.defined),
+        sw = 0.75,
+        fw = 400,
+        sc = UI.color.rim,
         ctxlids = ctxl.map((l) => l.identifier).join(';');
+    if(incxd) {
+      sw = 1.5;
+      fw = 900;
+      sc = 'black';
+    }
     if(n) {
       fg = 'white';
       bg = '#9090a0';
@@ -211,15 +222,18 @@ class Shape {
         }
       }
     }
-    const c = this.addCircle(x, y, 7,
-        {fill: bg, stroke: UI.color.rim, 'stroke-width': 0.75,
-            'data-id': id, 'data-aspect': cl, 'data-bg': bg,
-            'data-fg': fg, 'data-lids': ctxlids});
-    this.addText(x, y, cl, {'fill': fg, 'font-size': 7});
+    const c = this.addCircle(x, y, 6,
+        {fill: bg, stroke: sc, 'stroke-width': sw,
+            'font-weight': fw, 'data-id': id, 'data-aspect': cl,
+            'data-bg': bg, 'data-fg': fg, 'data-ix': incxd,
+            'data-lids': ctxlids});
+    this.addText(x, y, cl,
+        {'font-family': 'monospace', 'fill': fg, 'font-size': 9});
     // Make SVG elements responsive to cursor event.
     c.setAttribute('pointer-events', 'auto');
-    // Only the Output connector can be a tail connector.
-    if(cl === 'O') c.setAttribute('cursor', 'pointer');
+    // Only the Output connector can be a tail connector, but for other
+    // connectors an incoming expression can be defined.
+    c.setAttribute('cursor', 'pointer');
     UI.connector(c);
     if(ctxlids) {
       // Add a mouseover event that will display context links in the
@@ -227,7 +241,6 @@ class Shape {
       c.addEventListener('mouseover', (event) => {
           DOCUMENTATION_MANAGER.showContextLinks(event);
         });
-      c.addEventListener('mouseout', () => { UI.deep_link_info = ''; });
     }
     return this.element;
   }
@@ -1003,8 +1016,8 @@ class Paper {
             Math.sign(dcy) * pi3 * 0.5),
         fcpsin = Math.sin(fcpa),
         fcpcos = Math.cos(fcpa); 
-    x1 = cx1 + 8 * fcpcos;
-    y1 = cy1 + 8 * fcpsin;
+    x1 = cx1 + 7 * fcpcos;
+    y1 = cy1 + 7 * fcpsin;
     fcx = cx1 + dr * fcpcos;
     // NOTE: Pull more up or down when TO lies left of FROM; otherwise
     // stay a bit more horizontal so that line becomes a bit curved.
@@ -1025,8 +1038,8 @@ class Paper {
             angle + (to_i ? Math.sign(dcy) * part : Math.sign(dcx)) * pi3 * rot),
         tcpsin = Math.sin(tcpa),
         tcpcos = Math.cos(tcpa);
-    x2 = cx2 + tcpcos * 11;
-    y2 = cy2 + tcpsin * 11;
+    x2 = cx2 + tcpcos * 10;
+    y2 = cy2 + tcpsin * 10;
     tcx = cx2 + tcpcos * dr;
     tcy = cy2 + tcpsin * dr + (to_i && dcx < 0 ? dr - Math.sign(dcy) * 50 : 0);
     // First draw a thick but near-transparent line so that the mouse
@@ -1103,8 +1116,10 @@ class Paper {
           le.setAttribute('font-weight', 700);
         }
         le.setAttribute('style',
-            'text-shadow: 0.5px 0.5px white, -0.5px -0.5px white, ' +
-                '0.5px -0.5px white, -0.5px 0.5px white' + nimbus);
+            'text-shadow: 0.5px 0.5px rgb(255, 255, 255, 0.6), ' +
+                '-0.5px -0.5px rgb(255, 255, 255, 0.6), ' +
+                '0.5px -0.5px rgb(255, 255, 255, 0.6), ' +
+                '-0.5px 0.5px rgb(255, 255, 255, 0.6)' + nimbus);
         // Add identifying data attribute...
         le.setAttribute('data-id', aid);
         // ... also for the link...

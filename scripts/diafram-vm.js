@@ -403,11 +403,14 @@ class Expression {
 // an array of VM instructions.
 
 class ExpressionParser {
-  constructor(text, owner=null) {
+  constructor(text, owner=null, connector='') {
     // Setting TRACE to TRUE will log parsing information to the console.
     this.TRACE = false;
     // `owner` is the aspect for which the expression is parsed.
     this.owner = owner;
+    // `connector` is the aspect letter (CRPIT) in case an incoming
+    // expression is parsed.
+    this.connector = connector;
     // `text` is the expression string to be parsed.
     this.expr = text;
     this.expansions = [];
@@ -454,7 +457,9 @@ class ExpressionParser {
         this.ownerName, ' -->  ', this.expr);
 
     // Only aspects in scope can be used.
-    const aspects = this.owner.parent.aspectsInScope;
+    const aspects = (this.owner instanceof Aspect ?
+        this.owner.parent.aspectsInScope :
+        this.owner.incomingAspects(this.connector));
 
     // Initialize possible components.
     let obj = null,
