@@ -50,29 +50,26 @@ class ExpressionEditor {
     this.variables = md.element('variables');
     // The quick guide to diaFRAM expressions.
     this.help.innerHTML = `
-<h3>diaFRAM expressions</h3>
-<p><em>NOTE: Move cursor over a</em> <code>symbol</code>
-  <em>for explanation.</em>
+<p><span style="font-size: 13px; font-weight: bold">diaFRAM expressions</span> &ndash;
+<em>Move cursor over a</em> <code>symbol</code> <em>for explanation.</em>
 <p>
 <h4>Variables</h4>
-<p>
-  <em>Aspects</em> are enclosed by brackets, e.g.,
-  <code title="NOTE: Aspect names are not sensitive to case or spacing.">[some aspect (actor)]</code>.
-  Solver properties
-  (<code title="Time step (starts at 1)">t</code>,
-  <code title="Duration of 1 time step (in hours)">dt</code>,
-  <code title="Run length (# time steps)">N</code>,
-  <code title="Number of time steps in 1 year">yr</code>,
-  <code title="Number of time steps in 1 week">wk</code>,
-  <code title="Number of time steps in 1 day">d</code>,
-  <code title="Number of time steps in 1 hour">h</code>,
-  <code title="Number of time steps in 1 minute">m</code>,
-  <code title="Number of time steps in 1 second">s</code>,
-  <code title="A random number from the uniform distribution U(0, 1)">random</code>),
-  constants (<code title="Mathematical constant &pi; = ${Math.PI}">pi</code>,
+<p>Names of system aspects must be enclosed by brackets, e.g.,
+  <code>[some aspect]</code>, to distinguish them from pre-defined variables
+  (<code title="Cycle number (starts at 1)">c</code>,
+  <code title="Simulated clock time (in hours)">now</code>,
+  <code title="A random number from the uniform distribution U(0, 1)">random</code>)
+  and constants
+  (<code title="Mathematical constant &pi; = ${Math.PI}">pi</code>,
   <code title="Logical constant true = 1
 NOTE: any non-zero value evaluates as true">true</code>,
-  <code title="Logical constant false = 0">false</code>.
+  <code title="Logical constant false = 0">false</code>,
+  <code title="Number of hours in 1 year">yr</code>,
+  <code title="Number of hours in 1 week">wk</code>,
+  <code title="Number of hours in 1 day">d</code>,
+  <code title="Number of hours in 1 hour (1)">h</code>,
+  <code title="Number of hours in 1 minute">m</code>,
+  <code title="Number of hours in 1 second">s</code>).
 </p>
 <h4>Operators</h4>
 <p><em>Monadic:</em>
@@ -88,15 +85,15 @@ NOTE: any non-zero value evaluates as true">true</code>,
   <code title="sin X evaluates as the sine of X">sin</code>,
   <code title="cos X evaluates as the cosine of X">cos</code>,
   <code title="atan X evaluates as the inverse tangent of X">atan</code>,
+  <code title="max(X1;&hellip;;Xn) evaluates as the highest value of X1, &hellip;, Xn">max</code>,
+  <code title="min(X1;&hellip;;Xn) evaluates as the lowest value of X1, &hellip;, Xn">min</code>,
   <code title="binomial X evaluates as a random number from the Binomial(N, p) distribution">binomial</code>,
   <code title="exponential X evaluates as a random number from the Exponential(&lambda;) distribution">exponential</code>,
   <code title="normal(X;Y) evaluates as a random number from the Normal(&mu;,&sigma;) distribution">normal</code>,
   <code title="poisson(X) evaluates as a random number from the Poisson(&lambda;) distribution">poisson</code>,
   <code title="triangular(X;Y;Z) evaluates as a random number from the Triangular(a,b,c) distribution
 NOTE: When omitted, the third parameter c defaults to (a+b)/2">triangular</code>,
-  <code title="weibull(X;Y) evaluates as a random number from the Weibull(&lambda;,k) distribution">weibull</code>,
-  <code title="max(X1;&hellip;;Xn) evaluates as the highest value of X1, &hellip;, Xn">max</code>,
-  <code title="min(X1;&hellip;;Xn) evaluates as the lowest value of X1, &hellip;, Xn">min</code><br>
+  <code title="weibull(X;Y) evaluates as a random number from the Weibull(&lambda;,k) distribution">weibull</code><br>
 
   <em>Arithmetic:</em>
   <code title="X + Y = sum of X and Y">+</code>,
@@ -131,8 +128,10 @@ NOTE: When omitted, the third parameter c defaults to (a+b)/2">triangular</code>
   <em>Grouping:</em>
   <code title="X ; Y evaluates as a group or &ldquo;tuple&rdquo; (X, Y)
 NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates as (1;2;3;4;5)">X ; Y</code>
-  (use only in combination with <code>max</code>, <code>min</code>, <code>npv</code>
-  and probabilistic operators)<br>
+  (use only in combination with <code>max</code>, <code>min</code> and probabilistic operators)<br>
+  <em>Clock time:</em> <code>waituntil(</code>X<code>)</code> sets the simulation clock time to X hours
+  and evaluates as the new time X, or as 0 (<code>false</code>) if X < <code>now</code>;
+  <code>wait(</code>X<code>)</code> is shorthand for <code>waituntil(now + </code>X<code>)</code>. 
 </p>
 <p>
   Monadic operators take precedence over dyadic operators.

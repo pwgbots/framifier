@@ -1031,7 +1031,7 @@ class Paper {
             (dcy < 0 ? -slatan : 2 * Math.PI - slatan)),
         da = angle - slangle,
         to_i = tc === 'I',
-        part = (to_i && dcx > 0 ? 0.5 : 1),
+        part = (to_i && dcx > 0 ? 0.1 : 1),
         tpm60 = Math.abs(da) < pi3 * part,
         rot = ('TC'.indexOf(tc) >= 0 ? -1 :  1),
         tcpa = (tpm60 ? slangle :
@@ -1040,7 +1040,7 @@ class Paper {
         tcpcos = Math.cos(tcpa);
     x2 = cx2 + tcpcos * 10;
     y2 = cy2 + tcpsin * 10;
-    tcx = cx2 + tcpcos * dr;
+    tcx = cx2 + tcpcos * (dr + 3 / part);
     tcy = cy2 + tcpsin * dr + (to_i && dcx < 0 ? dr - Math.sign(dcy) * 50 : 0);
     // First draw a thick but near-transparent line so that the mouse
     // events is triggered sooner.

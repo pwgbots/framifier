@@ -162,9 +162,18 @@ td > img {
   text-align: center;
 }
 
+#clock-time {
+  width: 72px;
+  padding-right: 3px;
+  padding-left: 3px;
+  text-align: right;
+  white-space: nowrap;
+}
+
 #pos-y,
 #zoom-sep,
 #step-sep,
+#clock-time,
 #info-line,
 #issue-panel,
 #autosave-sep {
@@ -1065,8 +1074,8 @@ img.inline-cancel-btn {
 }
 
 #expression-dlg {
-  width: 550px;
-  height: 300px;
+  width: 565px;
+  height: 310px;
 }
 
 #expression-scope {

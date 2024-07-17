@@ -72,8 +72,11 @@ class diaFRAMModel {
     this.set_up = false;
     this.solved = false;
     // t is the time step ("tick") shown.
-    this.t = 1;
+    this.t = 0;
     this.run_length = 100;
+    // Clock time is a vector with for each "tick" the clock time in hours.
+    this.clock_time = [];
+    this.cleanVector(this.clock_time, 0);
   }
   
   // NOTE: A model can also be the entity for the documentation manager,
@@ -89,10 +92,9 @@ class diaFRAMModel {
 
   /* METHODS THAT LOOKUP ENTITIES, OR INFER PROPERTIES */
 
-  get simulationTimeStep() {
-    // Return actual model time step, rather than `t`, which is relative
-    // to the start of the simulation period.
-    return this.t;
+  get simulationTime() {
+    // Return the simulated clock time for the current "tick" (= cycle).
+    return this.clock_time[this.t];
   }
   
   get newActivityCode() {
@@ -1054,15 +1056,6 @@ class diaFRAMModel {
     return seq;
   }
 
-  get allExpressions() {
-    // Return list of all Expression objects in this model.
-    const xl = [];
-    for(let k in this.aspects) if(this.aspects.hasOwnProperty(k)) {
-      xl.push(this.aspects[k].expression);
-    }
-    return xl;
-  }
-
   //
   // Methods for loading and saving the model
   //
@@ -1266,12 +1259,35 @@ class diaFRAMModel {
     v[0] = initial;
   }
   
+  get allExpressions() {
+    // Return list of all Expression objects in this model.
+    const xl = [];
+    // Each aspect has an expression.
+    for(let k in this.aspects) if(this.aspects.hasOwnProperty(k)) {
+      xl.push(this.aspects[k].expression);
+    }
+    // Activities may have an expression for their CRPIT connections.
+    for(let k in this.activities) if(this.activities.hasOwnProperty(k)) {
+      const
+          ix = this.activities[k].incoming_expressions,
+          ic = Object.keys(ix);
+      for(let i = 0; i < ic.length; i++) xl.push(ix[ic[i]]);
+    }
+    return xl;
+  }
+
   resetExpressions() {
     // Create a new vector for all expression attributes of all model
     // entities, using the appropriate default value.
     const ax = this.allExpressions;
     for(let i = 0; i < ax.length; i++) {
       ax[i].reset(0);
+    }
+    for(let k in this.activities) if(this.activities.hasOwnProperty(k)) {
+      const s = this.activities[k].state;
+      for(let c in s) if(s.hasOwnProperty(c)) {
+        this.cleanVector(s[c], VM.UNDEFINED);
+      }
     }
   }
 
@@ -1638,7 +1654,7 @@ class NodeBox extends ObjectWithXYWH {
         ow = this.width,
         oh = this.height,
         an = (this.hasActor ? this.actor.name : ''),
-        ratio = (this instanceof Activity ? 0.45 : 0.3);
+        ratio = (this instanceof Activity ? 0.5 : 0.25);
     this.name_lines = nameToLines(this.name, an, ratio);
     this.bbox = UI.textSize(this.name_lines, 10);
     if(this instanceof Aspect) {
@@ -1773,10 +1789,12 @@ class Activity extends NodeBox {
   constructor(parent, name, actor) {
     super(parent, name, actor);
     this.sub_activities = [];
-    this.connections = {C: [], O: [], R: [], P: [], I: [], T: [], S: []};
+    this.connections = {C: [], O: [], R: [], P: [], I: [], T: []};
     this.incoming_expressions = {};
     this.notes = [];
     this.predecessors = [];
+    // The state of an activity comprises one vector per connector.
+    this.state = {C: [], O: [], R: [], P: [], I: [], T: []};
   }
   
   get type() {

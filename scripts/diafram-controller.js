@@ -933,11 +933,33 @@ class GUIController {
       this.paper.drawNote(obj);
     }
   }
+  
+  clockTime(secs=true) {
+    // Returns real number `hrs` as dd hh:mm:ss where dd is the number of
+    // days, and the seconds :ss are omitted when `secs` is FALSE.
+    const
+        hrs = MODEL.simulationTime,
+        sv = VM.specialValue(hrs);
+    if(hrs < 0) return hrs.toPrecision(3);
+    if(sv[0]) return sv[1];
+    const
+        d = Math.floor(hrs / 24),
+        h = Math.floor(hrs - 24 * d),
+        m = Math.floor((hrs - 24 * d - h) * 60),
+        s = Math.floor(hrs * 60 % 1 * 60),
+        ds = (d ? d + 'd ' : ''),
+        hs = h.toString().padStart(2, '0'),
+        ms = m.toString().padStart(2, '0'),
+        ss = (secs ? ':' + s.toString().padStart(2, '0') : '');
+    return `${ds}${hs}:${ms}${ss}`;
+  }
 
-  updateTimeStep(t=MODEL.simulationTimeStep) {
-    // Display `t` as the current time step.
+  updateTimeStep(t=MODEL.t) {
+    // Display cycle tick `t` as the current cycle number.
     // NOTE: The Virtual Machine passes its relative time `VM.t`.
-    document.getElementById('step').innerHTML = t;
+    document.getElementById('step').innerText = t;
+    document.getElementById('clock-time').innerHTML =
+        `&#x231A;${this.clockTime()}`;
   }
   
   stopSolving() {
@@ -2315,9 +2337,9 @@ class GUIController {
   
   stepBack(e) {
     if(e.target.classList.contains('disab')) return;
-    if(MODEL.simulationTimeStep > MODEL.start_period) {
+    if(MODEL.t > 0) {
       const dt = (e.shiftKey ? 10 : 1) * (e.ctrlKey || e.metaKey ? 100 : 1);
-      MODEL.t = Math.max(1, MODEL.t - dt);
+      MODEL.t = Math.max(0, MODEL.t - dt);
       UI.updateTimeStep();
       UI.drawDiagram(MODEL);
     }
@@ -2325,9 +2347,9 @@ class GUIController {
   
   stepForward(e) {
     if(e.target.classList.contains('disab')) return;
-    if(MODEL.simulationTimeStep < MODEL.end_period) {
+    if(MODEL.t < MODEL.run_length) {
       const dt = (e.shiftKey ? 10 : 1) * (e.ctrlKey || e.metaKey ? 100 : 1);
-      MODEL.t = Math.min(MODEL.end_period - MODEL.start_period + 1, MODEL.t + dt);
+      MODEL.t = Math.min(MODEL.run_length, MODEL.t + dt);
       UI.updateTimeStep();
       UI.drawDiagram(MODEL);
     }
@@ -2504,7 +2526,7 @@ class GUIController {
     MODEL = new diaFRAMModel(
         md.element('name').value.trim(), md.element('author').value.trim());
     md.hide();
-    this.updateTimeStep(MODEL.simulationTimeStep);
+    this.updateTimeStep();
     this.drawDiagram(MODEL);
     UNDO_STACK.clear();
     VM.reset();

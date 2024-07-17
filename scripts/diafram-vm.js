@@ -432,6 +432,39 @@ class ExpressionParser {
     console.log(`Expression for ${this.ownerName}: ${this.expr}\n${msg}`);
   }
   
+  incomingExpression(c) {
+    // Return incoming expression for connector `c` of the owner's parent
+    // activity if the owner is an aspect, otherwise NULL.
+    const
+        valid = {
+          'c': 'C',
+          'control': 'C',
+          'o': 'O',
+          'output': 'O',
+          'r': 'R',
+          'resource': 'R',
+          'p': 'P',
+          'precondition': 'P',
+          'i': 'I',
+          'input': 'I',
+          't': 'T',
+          'time': 'T'
+        },
+        con = valid[c],
+        obj = this.owner;
+    if(con) {
+      if(con === 'O') {
+        this.error = 'Outputs must be specified as [aspect name]';
+      } else if(obj instanceof Activity) {
+        this.error = 'Expressions for \u24CD cannot refer to any \u24CE';
+      } else {
+        // If no expression defined, return a dummy expression.
+        return obj.parent.incoming_expressions[con] || new Expression(obj, '');
+      }
+    }
+    return null;
+  }
+  
   // The method parseVariable(name) checks whether `name` fits this pattern:
   //   aspect@offset_1:offset_2
   // allowing spaces around @ and :
@@ -606,7 +639,7 @@ class ExpressionParser {
     let c, f, i, l, v;
     this.prev_sym = this.sym;
     this.sym = null;
-    // Skip whitespace
+    // Skip whitespace.
     while(this.pit <= this.eot && this.expr.charAt(this.pit) <= ' ') {
       this.pit++;
     }
@@ -697,14 +730,20 @@ class ExpressionParser {
         }
       } else {
         // Symbol does not start with a digit
-        // NOTE: distinguish between run length N and block length n
-        i = ACTUAL_SYMBOLS.indexOf(l === 'n' ? v : l);
-        if(i < 0) {
-          this.error = `Invalid symbol "${v}"`;
-        } else {
-          this.sym = SYMBOL_CODES[i];
-          // NOTE: Using time symbols or `random` makes the expression dynamic! 
-          if(DYNAMIC_SYMBOLS.indexOf(l) >= 0) this.is_static = false;
+        const ax = this.incomingExpression(l);
+        if(ax) {
+          // NOTE: No offsets (yet) for incoming expression operands.
+          this.sym = [ax, 't',0, 't', 0];
+          this.is_static = this.is_static && ax.isStatic;
+        } else if(!this.error) {
+          i = ACTUAL_SYMBOLS.indexOf(l);
+          if(i < 0) {
+            this.error = `Invalid symbol "${v}"`;
+          } else {
+            this.sym = SYMBOL_CODES[i];
+            // NOTE: Using time symbols or `random` makes the expression dynamic! 
+            if(DYNAMIC_SYMBOLS.indexOf(l) >= 0) this.is_static = false;
+          }
         }
       }
       this.pit += this.los;
@@ -1474,118 +1513,16 @@ function VMI_push_time_step(x) {
   // Push the current time step.
   // NOTE: This is the "local" time step for expression `x` (which always
   // starts at 1), adjusted for the first time step of the simulation period.
-  const t = x.step[x.step.length - 1] + MODEL.start_period - 1; 
-  if(DEBUGGING) console.log('push absolute t = ' + t);
-  x.push(t);
-}
-
-function VMI_push_delta_t(x) {
-  // Push the duration of 1 time step (in hours).
-  const dt = MODEL.time_scale * VM.time_unit_values[MODEL.time_unit]; 
-  if(DEBUGGING) console.log('push delta-t = ' + dt);
-  x.push(dt);
-}
-
-function VMI_push_relative_time(x) {
-  // Push the "local" time step for expression `x`.
-  // NOTE: Time step for optimization period always starts at 1.
   const t = x.step[x.step.length - 1]; 
-  if(DEBUGGING) console.log('push relative t = ' + t);
+  if(DEBUGGING) console.log('push cycle number c = ' + t);
   x.push(t);
 }
 
-function VMI_push_block_time(x) {
-  // Push the "local" time step for expression `x` (which always starts
-  // at 1) adjusted for the first time step of the current block.
-  const
-      lt = x.step[x.step.length - 1] - 1,
-      bnr = Math.floor(lt / MODEL.block_length),
-      t = lt - bnr * MODEL.block_length + 1;
-  if(DEBUGGING) console.log('push block time bt = ' + t);
+function VMI_push_clock_time(x) {
+  // Push the simulated clock time (in hours).
+  const t = MODEL.clock_time; 
+  if(DEBUGGING) console.log('push clock time t = ' + t);
   x.push(t);
-}
-
-function VMI_push_chunk_time(x) {
-  // Push the time step for which the VM is preparing the tableau.
-  // NOTE: Chunk time is meaningful only while the VM is solving a block.
-  // If not, the block time is pushed.
-  if(VM.executing_tableau_code) {
-    const
-        ct = VM.t - (VM.block_count - 1) * MODEL.block_length;
-    if(DEBUGGING) console.log('push chunk time ct = ' + ct);
-    x.push(ct);
-  } else {
-    if(DEBUGGING) console.log('push chunk time: NOT constructing tableau'); 
-    VMI_push_block_time(x);    
-  }
-}
-
-function VMI_push_block_number(x) {
-  // Push the number of the block currently being optimized.
-  // NOTE: Block numbering starts at 1.
-  const local_t = x.step[x.step.length - 1] - 1,
-        bnr = Math.floor(local_t / MODEL.block_length) + 1;
-  if(DEBUGGING) console.log('push current block number = ' + bnr);
-  x.push(bnr);
-}
-
-function VMI_push_run_length(x) {
-  // Push the run length (excl. look-ahead!).
-  const n = VM.nr_of_time_steps;
-  if(DEBUGGING) console.log('push run length N = ' + n);
-  x.push(n);
-}
-
-function VMI_push_block_length(x) {
-  // Push the block length.
-  if(DEBUGGING) console.log('push block length n = ' + MODEL.block_length);
-  x.push(MODEL.block_length);
-}
-
-function VMI_push_look_ahead(x) {
-  // Push the look-ahead.
-  if(DEBUGGING) console.log('push look-ahead l = ' + MODEL.look_ahead);
-  x.push(MODEL.look_ahead);
-}
-
-function VMI_push_round(x) {
-  // Push the current round number (a=1, z=26, etc.).
-  const r = VM.round_letters.indexOf(VM.round_sequence[VM.current_round]);
-  if(DEBUGGING) console.log('push round number R = ' + r);
-  x.push(r);
-}
-
-function VMI_push_last_round(x) {
-  // Push the last round number (a=1, z=26, etc.).
-  const r = VM.round_letters.indexOf(VM.round_sequence[MODEL.rounds - 1]);
-  if(DEBUGGING) console.log('push last round number LR = ' + r);
-  x.push(r);
-}
-
-function VMI_push_number_of_rounds(x) {
-  // Push the number of rounds (= length of round sequence).
-  if(DEBUGGING) console.log('push number of rounds NR = ' + MODEL.rounds);
-  x.push(MODEL.rounds);
-}
-
-function VMI_push_run_number(x) {
-  // Push the number of the current run in the selected experiment (or 0).
-  const
-      sx = EXPERIMENT_MANAGER.selected_experiment,
-      nox = (sx ? ` (in ${sx.title})` : ' (no experiment)'),
-      xr = (sx ? sx.active_combination_index : 0);
-  if(DEBUGGING) console.log('push current run number XR = ' + xr + nox);
-  x.push(xr);
-}
-
-function VMI_push_number_of_runs(x) {
-  // Push the number of runs in the current experiment (0 if no experiment).
-  const
-      sx = EXPERIMENT_MANAGER.selected_experiment,
-      nox = (sx ? `(in ${sx.title})` : '(no experiment)'),
-      nx = (sx ? sx.combinations.length : 0);
-  if(DEBUGGING) console.log('push number of rounds NR =', nx, nox);
-  x.push(nx);
 }
 
 function VMI_push_random(x) {
@@ -1593,6 +1530,36 @@ function VMI_push_random(x) {
   const r = Math.random();
   if(DEBUGGING) console.log('push random =', r);
   x.push(r);
+}
+
+function VMI_wait_until(x) {
+  // Advance the simulated clock time to the stack top, and return the
+  // new time, or 0 if X is less than the current time.
+  const d = x.top();
+  if(d !== false) {
+    if(DEBUGGING) console.log(`WAIT UNTIL ${d} (clock time: ${MODEL.clock_time})`);
+    if(d < MODEL.clock_time) {
+      x.retop(0);      
+    } else {
+      MODEL.clock_time = d;
+      x.retop(MODEL.clock_time);
+    }
+  }
+}
+
+function VMI_wait(x) {
+  // Advance the simulated clock time by the value on the stack top (if >= 0),
+  // and return the new time, or 0 if X has a negative value.
+  const d = x.top();
+  if(d !== false) {
+    if(DEBUGGING) console.log(`WAIT ${d} (clock time: ${MODEL.clock_time})`);
+    if(d < 0) {
+      x.retop(0);      
+    } else {
+      MODEL.clock_time += d;
+      x.retop(MODEL.clock_time);
+    }
+  }
 }
 
 function VMI_push_pi(x) {
@@ -1619,81 +1586,40 @@ function VMI_push_infinity(x) {
   x.push(VM.PLUS_INFINITY);
 }
 
-function valueOfIndexVariable(v) {
-  // AUXILIARY FUNCTION for the VMI_push_(i, j or k) instructions.
-  // Return the value of the iterator index variable for the current
-  // experiment.
-  if(MODEL.running_experiment) {
-    const
-        lead = v + '=',
-        combi = MODEL.running_experiment.activeCombination;
-    for(let i = 0; i < combi.length; i++) {
-      const sel = combi[i] ;
-      if(sel.startsWith(lead)) return parseInt(sel.substring(2));
-    }
-  }
-  return 0;
-}
-
-function VMI_push_i(x) {
-  // Push the value of iterator index i.
-  const i = valueOfIndexVariable('i');
-  if(DEBUGGING) console.log('push i = ' + i);
-  x.push(i);
-}
-
-function VMI_push_j(x) {
-  // Push the value of iterator index j.
-  const j = valueOfIndexVariable('j');
-  if(DEBUGGING) console.log('push j = ' + j);
-  x.push(j);
-}
-
-function VMI_push_k(x) {
-  // Push the value of iterator index k.
-  const k = valueOfIndexVariable('k');
-  if(DEBUGGING) console.log('push k = ' + k);
-  x.push(k);
-}
-
-function pushTimeStepsPerTimeUnit(x, unit) {
-  // AUXILIARY FUNCTION for the VMI_push_(time unit) instructions.
-  // Push the number of model time steps represented by 1 unit.
-  // NOTE: This will typically be a real number -- no rounding.
-  const t = VM.time_unit_values[unit] / MODEL.time_scale /
-      VM.time_unit_values[MODEL.time_unit]; 
-  if(DEBUGGING) console.log(`push ${unit} = ${VM.sig4Dig(t)}`);
-  x.push(t);
-}
-
 function VMI_push_year(x) {
-  // Push the number of time steps in one year.
-  pushTimeStepsPerTimeUnit(x, 'year');
+  // Push the number of hours in one year.
+  if(DEBUGGING) console.log('push h/yr = 8760');
+  x.push(8760);
 }
 
 function VMI_push_week(x) {
-  // Push the number of time steps in one week.
-  pushTimeStepsPerTimeUnit(x, 'week');
+  // Push the number of hourss in one week.
+  if(DEBUGGING) console.log('push h/wk = 168');
+  x.push(168);
 }
 
 function VMI_push_day(x) {
-  // Push the number of time steps in one day.
-  pushTimeStepsPerTimeUnit(x, 'day');
+  // Push the number of hours in one day.
+  if(DEBUGGING) console.log('push h/d = 24');
+  x.push(24);
 }
 
 function VMI_push_hour(x) {
-  // Push the number of time steps in one hour.
-  pushTimeStepsPerTimeUnit(x, 'hour');
+  // Push the number of hours in one hour.
+  if(DEBUGGING) console.log('push h/h = 1');
+  x.push(1);
 }
 
 function VMI_push_minute(x) {
-  // Push the number of time steps in one minute.
-  pushTimeStepsPerTimeUnit(x, 'minute');
+  // Push the number of hours in one minute.
+  if(DEBUGGING) console.log('push h/m = 1/60');
+  x.push(1 / 60);
 }
 
 function VMI_push_second(x) {
-  // Push the number of time steps in one second.
-  pushTimeStepsPerTimeUnit(x, 'second');
+  // Push the number of hours in one second.
+  if(DEBUGGING) console.log('push h/s = 1/3600');
+  x.push(1 / 3600);
 }
 
 function VMI_push_contextual_number(x) {
@@ -1735,22 +1661,6 @@ function relativeTimeStep(t, anchor, offset, dtm, x) {
   if(anchor === '#') {
     // Index: offset is added to the inferred value of the # symbol.
     return valueOfNumberSign(x) + offset;
-  }
-  if(anchor === 'r') {
-    // Offset relative to current time step, scaled to time unit of run.
-    return Math.floor((t + offset) * dtm);
-  }
-  if(anchor === 'f') {
-    // Last: offset relative to index  1 in the vector.
-    return 1 + offset;
-  }
-  if(anchor === 'l') {
-    // Last: offset relative to the last index in the vector.
-    return VM.nr_of_time_steps + offset;
-  }
-  if(anchor === 's') {
-    // Scaled: offset is scaled to time unit of run.
-    return Math.floor(offset * dtm);
   }
   // Fall-through: offset relative to the initial value index (0).
   return offset;
@@ -2565,31 +2475,25 @@ const
   SEPARATOR_CHARS = PARENTHESES + OPERATOR_CHARS + "[ '",
   COMPOUND_OPERATORS = ['!=', '<>', '>=', '<='],
   CONSTANT_SYMBOLS = [
-      't', 'rt', 'bt', 'ct', 'b', 'N', 'n', 'l', 'r', 'lr', 'nr', 'x', 'nx',
-      'random', 'dt', 'true', 'false', 'pi', 'infinity', '#',
-      'i', 'j', 'k', 'yr', 'wk', 'd', 'h', 'm', 's'],
+      'c', 'now', 'random', 'true', 'false', 'pi', 'infinity', '#',
+      'yr', 'wk', 'd', 'h', 'm', 's'],
   CONSTANT_CODES = [
-      VMI_push_time_step, VMI_push_relative_time, VMI_push_block_time,
-      VMI_push_chunk_time,
-      VMI_push_block_number, VMI_push_run_length, VMI_push_block_length,
-      VMI_push_look_ahead, VMI_push_round, VMI_push_last_round,
-      VMI_push_number_of_rounds, VMI_push_run_number, VMI_push_number_of_runs,
-      VMI_push_random, VMI_push_delta_t, VMI_push_true, VMI_push_false,
+      VMI_push_time_step, VMI_push_clock_time,
+      VMI_push_random, VMI_push_true, VMI_push_false,
       VMI_push_pi, VMI_push_infinity, VMI_push_contextual_number,
-      VMI_push_i, VMI_push_j, VMI_push_k,
       VMI_push_year, VMI_push_week, VMI_push_day, VMI_push_hour,
       VMI_push_minute, VMI_push_second],
-  DYNAMIC_SYMBOLS = ['t', 'rt', 'bt', 'ct', 'b', 'r', 'random', 'i', 'j', 'k'],
+  DYNAMIC_SYMBOLS = ['c', 'now', 'random', 'wait', 'waituntil'],
   MONADIC_OPERATORS = [
       '~', 'not', 'abs', 'sin', 'cos', 'atan', 'ln',
       'exp', 'sqrt', 'round', 'int', 'fract', 'min', 'max',
       'binomial', 'exponential', 'normal', 'poisson', 'triangular',
-      'weibull'],
+      'weibull', 'waituntil', 'wait'],
   MONADIC_CODES = [
       VMI_negate, VMI_not, VMI_abs, VMI_sin, VMI_cos, VMI_atan, VMI_ln,
       VMI_exp, VMI_sqrt, VMI_round, VMI_int, VMI_fract, VMI_min, VMI_max,
       VMI_binomial, VMI_exponential, VMI_normal, VMI_poisson, VMI_triangular,
-      VMI_weibull],
+      VMI_weibull, VMI_wait_until, VMI_wait],
   DYADIC_OPERATORS = [
       ';', '?', ':', 'or', 'and',
       '=', '<>', '!=',
@@ -2612,7 +2516,7 @@ const
   OPERATORS = DYADIC_OPERATORS.concat(MONADIC_OPERATORS), 
   OPERATOR_CODES = DYADIC_CODES.concat(MONADIC_CODES),
   PRIORITIES = [1, 2, 2, 3, 4, 5, 5, 5, 5, 5, 5, 5, 6, 6, 7, 7, 7, 8, 8, 10,
-      9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+      9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
   ACTUAL_SYMBOLS = CONSTANT_SYMBOLS.concat(OPERATORS),
   SYMBOL_CODES = CONSTANT_CODES.concat(OPERATOR_CODES);
 

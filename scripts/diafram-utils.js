@@ -813,8 +813,8 @@ function nameToLines(name, actor_name='', ratio=0.3) {
   let m = actor_name.length;
   const
       d = Math.floor(Math.sqrt(ratio * name.length)),
-      // Do not wrap strings shorter than 13 characters (about 50 pixels).
-      limit = Math.max(Math.ceil(name.length / d), m, 13),
+      // Do not wrap strings shorter than 12 characters (about 50 pixels).
+      limit = Math.max(Math.ceil(name.length / d), m, 12),
       a = name.split(' ');
   // Split words at '-' when wider than limit
   for(let j = 0; j < a.length; j++) {
