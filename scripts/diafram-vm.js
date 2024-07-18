@@ -1178,9 +1178,6 @@ class VirtualMachine {
     this.messages.length = 0;
     // Reset the (graphical) controller.
     MONITOR.reset();
-    // Solver license expiry date will be set to ['YYYYMMDD'], or to []
-    // if none.
-    this.license_expires = [];
     this.t = 0;
     // Prepare for halt.
     this.halted = false;
@@ -1406,6 +1403,7 @@ class VirtualMachine {
       const s = seq[k];
       for(let i = 0; i < s.length; i++) {
         console.log('HERE', s[i].displayName);
+        s[i].updateState();
       }
     }
   }

@@ -44,6 +44,9 @@ class GUIFileManager {
     // Get the XML of the file selected in the Load dialog.
     const md = UI.modals.load;
     md.hide();
+    // Clear messages now, so model loading messages will not be erased.
+    UI.clearStatusLine();
+    UI.time_last_message = 0;
     try {
       const file = md.element('xml-file').files[0];
       if(!file) return;

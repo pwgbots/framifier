@@ -878,12 +878,9 @@ class GUIController {
       // left of the SVG diagram, so reposition them.
       this.paper.fitToSize();
     }
-    // Cursor may have been set to `waiting` when decrypting.
-    this.normalCursor();
     // Reset the Virtual Machine.
     VM.reset();
     this.updateIssuePanel();
-    this.clearStatusLine();
     this.updateButtons();
     // Undoable operations no longer apply!
     UNDO_STACK.clear();

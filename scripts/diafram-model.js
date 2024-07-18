@@ -1915,7 +1915,7 @@ class Activity extends NodeBox {
     this.notes = [];
     this.predecessors = [];
     // The state of an activity comprises one vector per connector.
-    this.state = {C: [], O: [], R: [], P: [], I: [], T: []};
+    this.state = {C: [], O: [], R: [], P: [], I: [], T: [], A: []};
   }
   
   get type() {
@@ -1979,9 +1979,7 @@ class Activity extends NodeBox {
   hasIncomingFrom(acts) {
     // Return TRUE when this activity has an incoming link from any of
     // the activities in list `acts`.
-    console.log('HERE hif for', this.displayName);
     for(let i = 0; i < acts.length; i++) {
-      console.log('HERE hif', i, acts[i].displayName, acts[i].connections.O);
       const aoc = acts[i].connections.O;
       for(let j = 0; j < aoc.length; j++) {
         if(aoc[j].to_activity === this) return true;
@@ -2430,6 +2428,42 @@ class Activity extends NodeBox {
     }
     while(nrs.indexOf(nn) >= 0) nn++;
     return nn;
+  }
+  
+  updateState() {
+    console.log('HERE state', this.displayName, this.state, MODEL.t);
+    const
+        t = MODEL.t,
+        s = this.state,
+        ix = this.incoming_expressions;
+    for(let k in ix) if(ix.hasOwnProperty(k)) {
+      let r = ix[k].result(t);
+console.log('HERE r =', r);
+      if(r === VM.UNDEFINED) {
+        console.log('HERE conn[k]', k, this.connections[k]);
+      }
+      s[k][t] = r;
+    }
+    for(let k in s) if(s.hasOwnProperty(k)) {
+      if(s[k][t] > VM.EXCEPTION) {
+        // No incoming expression => check incoming link aspects.
+        let allset = true;
+        for(let i = 0; i < this.connections[k].length; i++) {
+          const l = this.connections[k][i];
+          console.log('HERE', l.displayName);
+          let cset = 0;
+          for(let j = 0; j < l.aspects.length; j++) {
+            cset += l.aspects[j].expression.result(MODEL.t);
+          }
+          allset = allset && cset > 0;
+        }
+        s[k][t] = (allset ? 1 : 0);
+      }
+    }
+    if(s.C[t] && s.R[t] && s.P[t] && s.I[t] && s.T[t]) {
+      s.A[t] = true;
+      console.log('Stat is TRUE', this.displayName);
+    }
   }
 
 } // END of class Activity

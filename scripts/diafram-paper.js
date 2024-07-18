@@ -1037,10 +1037,12 @@ class Paper {
         tcpa = (tpm60 ? slangle :
             angle + (to_i ? Math.sign(dcy) * part : Math.sign(dcx)) * pi3 * rot),
         tcpsin = Math.sin(tcpa),
-        tcpcos = Math.cos(tcpa);
+        tcpcos = Math.cos(tcpa),
+        ccx2 = ((tc === 'R' && dcx > 0 && dcy > 0) ||
+            (tc === 'C' && dcx > 0 && dcy < 0) ? -100 : 0);
     x2 = cx2 + tcpcos * 10;
     y2 = cy2 + tcpsin * 10;
-    tcx = cx2 + tcpcos * (dr + 3 / part);
+    tcx = cx2 + tcpcos * (dr + 3 / part) + ccx2;
     tcy = cy2 + tcpsin * dr + (to_i && dcx < 0 ? dr - Math.sign(dcy) * 50 : 0);
     // First draw a thick but near-transparent line so that the mouse
     // events is triggered sooner.
