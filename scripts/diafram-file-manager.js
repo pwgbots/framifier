@@ -5,7 +5,6 @@ This tool is developed by Pieter Bots at Delft University of Technology.
 
 This JavaScript file (diafram-file-manager.js) provides the GUI
 functionality for the diaFRAM File Manager.
-
 */
 
 /*
@@ -30,37 +29,39 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// CLASS GUIFileManager provides the GUI for loading and saving models and
-// diagrams and handles the interaction with the MILP solver via POST requests
-// to the server.
-// NOTE: Because the console-only monitor requires Node.js modules, this
-// GUI class does NOT extend its console-only counterpart.
-
-
 // CLASS GUIFileManager
 class GUIFileManager {
+   constructor() {
+    this.last_file_name = '';
+    this.last_file_extension = '';
+   }
 
   // NOTE: The modal dialogs related to loading and saving a model file
   // are properties of the GUIController because they are activated by
   // buttons on the top menu.
 
-  readModel(event) {
-    // Read XML string from input file, decrypt if necessary, and then parse it
-    UI.loadModelFromXML(event.target.result);
-  }  
-  
   loadModel() {
-    // Get the XML of the file selected in the Load dialog
+    // Get the XML of the file selected in the Load dialog.
     const md = UI.modals.load;
     md.hide();
     try {
       const file = md.element('xml-file').files[0];
       if(!file) return;
-      if(file.name.split('.').pop() != 'dia') {
-        UI.warn('diaFRAM files should have extension .dia');
+      // Record file name for later use.
+      this.last_file_name = file.name;
+      if(file.name.indexOf('.') >= 0) {
+        this.last_file_extension = file.name.split('.').pop().toLowerCase();
+      } else {
+        this.last_file_extension = '';
+      }
+      if(this.last_file_extension === 'xfmv') {
+        UI.warn('Some data from FRAM Model Visualiser files will be ingnored'); 
+      } else if(this.last_file_extension != 'dfram') {
+        UI.warn('diaFRAM files should have extension .dfram');
       }
       const reader = new FileReader();
-      reader.onload = (event) => FILE_MANAGER.readModel(event);
+      // Read XML string from input file, and then parse it.
+      reader.onload = (event) => UI.loadModelFromXML(event.target.result);
       reader.readAsText(file);
     } catch(err) {
       UI.alert('Error while reading file: ' + err);
@@ -93,7 +94,7 @@ class GUIFileManager {
     const el = document.getElementById('xml-saver');
     el.href = 'data:attachment/text,' + encodeURI(xml);
     console.log('Encoded file size:', el.href.length);
-    el.download = 'model.dia';
+    el.download = 'model.dfram';
     if(el.href.length > 25*1024*1024 &&
         navigator.userAgent.search('Chrome') <= 0) {
       UI.notify('Model file size exceeds browser download limit of 25 MB');

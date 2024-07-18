@@ -869,6 +869,15 @@ class GUIController {
     // If not a valid diaFRAM model, ensure that the current model is clean.
     if(!loaded) MODEL = new diaFRAMModel();
     this.drawDiagram(MODEL);
+    if(FILE_MANAGER.last_file_extension === 'xfmv') {
+      // Use the file name as model name.
+      const parts = FILE_MANAGER.last_file_name.split('.');
+      if(parts.length > 1) parts.pop();
+      MODEL.name = parts.join('.');
+      // FRAM Model Visualizer models tend to place nodes too far to the
+      // left of the SVG diagram, so reposition them.
+      this.paper.fitToSize();
+    }
     // Cursor may have been set to `waiting` when decrypting.
     this.normalCursor();
     // Reset the Virtual Machine.
@@ -2153,7 +2162,7 @@ class GUIController {
       // End, Home, and left and right arrow keys.
       if(code === 'End') {
         e.preventDefault();
-        MODEL.t = MODEL.end_period - MODEL.start_period + 1;
+        MODEL.t = MODEL.run_length;
         UI.updateTimeStep();
         UI.drawDiagram(MODEL);
       } else if(code === 'Home') {

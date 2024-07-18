@@ -898,7 +898,7 @@ class Paper {
   drawModel(mdl) {
     // Draw the diagram for the focal activity.
     this.clear();
-    // Prepare to draw all elements in the focal sctivity.
+    // Prepare to draw all elements in the focal activity.
     const
         fa = mdl.focal_activity,
         vl = fa.visibleLinks,

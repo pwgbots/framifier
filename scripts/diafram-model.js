@@ -389,10 +389,12 @@ class diaFRAMModel {
       // If aspect by this name already exists, add it to the link
       // (if specified) and return it.
       if(obj instanceof Aspect) {
-        if(link) addDistinct(obj, link.aspects);
-        // NOTE: Aspect may have been restored after deletion, and then
-        // have no parent yet.
-        obj.parent = link.from_activity;
+        if(link) {
+          addDistinct(obj, link.aspects);
+          // NOTE: Aspect may have been restored after deletion, and then
+          // have no parent yet.
+          obj.parent = link.from_activity;
+        }
         return obj;
       }
       // Otherwise, warn the modeler.
@@ -1065,8 +1067,11 @@ class diaFRAMModel {
 //    try {
       // NOTE: Convert %23 back to # (escaped by function saveModel)
       const xml = parseXML(data.replace(/%23/g, '#'));
-      // NOTE: loading, not including => make sure that IO context is NULL
-      this.initFromXML(xml);
+      if(xml.nodeName === 'FM') {
+        this.initFromFMV(xml);
+      } else {
+        this.initFromXML(xml);
+      }
       return true;
 /*
     } catch(err) {
@@ -1208,6 +1213,123 @@ class diaFRAMModel {
           a = this.activityByCode(o.subact);
       if(a instanceof Activity) a.setParent(o.parent);
     }
+  }
+  
+  initFromFMV(node) {
+    // Initialize model from FRAM Model Visualizer XML with `node` as root.
+    this.reset();
+    // Ensure that top activity has code "0", as all N FMV functions have
+    // ID number 0, ..., N-1 to which 1 will be added.
+    this.top_activity.code = '0';
+    // Create all activities.
+    let max_acode = 1,
+        n = childNodeByTag(node, 'Functions');
+    if(n && n.childNodes) {
+      for(let i = 0; i < n.childNodes.length; i++) {
+        const c = n.childNodes[i];
+        if(c.nodeName === 'Function') {
+          const
+              name = nodeContentByTag(c, 'IDName'),
+              a = this.addActivity(name, UI.NO_ACTOR);
+          if(a) {
+            a.parent = this.top_activity;
+            // NOTE: Add 1 to function ID because top activity has code 0.
+            const acode = safeStrToInt(nodeContentByTag(c, 'IDNr')) + 1;
+            max_acode = Math.max(max_acode, acode);
+            a.code = acode.toString();
+            const desc = nodeContentByTag(c, 'Description');
+            if(desc !== 'null') a.comments = desc;
+            a.x = safeStrToFloat(nodeParameterValue(c, 'x'));
+            a.y = safeStrToFloat(nodeParameterValue(c, 'y'));
+          }
+        }
+      }
+    }
+    this.next_activity_number = max_acode + 1;
+    // Establish the sub-activity hierarchy.
+    n = childNodeByTag(node, 'Groups');
+    if(n && n.childNodes) {
+      for(let i = 0; i < n.childNodes.length; i++) {
+        const c = n.childNodes[i];
+        if(c.nodeName === 'Group') {
+          const
+              code = addOne(nodeContentByTag(c, 'FunctionIDNr')),
+              pa = this.activityByCode(code),
+              subs = nodeContentByTag(c, 'CHILD').split('|');
+          if(pa) {
+            // Create a "container" activity having the name of the
+            // parent activity suffixed by a black hexagon.
+            const ca = this.addActivity(pa.name + '\u2B23', UI.NO_ACTOR);
+            ca.x = pa.x;
+            ca.y = pa.y;
+            pa.setParent(ca);
+            for(let j = 0; j < subs.length; j++) {
+              const sa = this.activityByCode(addOne(subs[j]));
+              if(sa) sa.setParent(ca);
+            }
+          }
+        }
+      }
+    }
+    // Get all aspects from the aspect nodes.
+    const
+        corpits = {
+          Control: {},
+          Input: {},
+          Output: {},
+          Precondition: {},
+          Resource: {},
+          Time: {}
+        },
+        tags = Object.keys(corpits);
+    for(let j = 0; j < tags.length; j++) {
+      const tag = tags[j];
+      n = childNodeByTag(node, tag + 's');
+      if(n && n.childNodes) {
+        for(let i = 0; i < n.childNodes.length; i++) {
+          const c = n.childNodes[i];
+          if(c.nodeName === tag) {
+            const
+                name = nodeContentByTag(c, 'IDName'),
+                obj = this.objectByName(name),
+                // NOTE: FMV files appear not to enforce name uniqueness,
+                // so aspects and function can have the same name. When
+                // this is detected, aspect names are suffixed by a 6-pointed
+                // star symbol.
+                mark = (obj && !(obj instanceof Aspect) ? '\u2736' : ''),
+                desc = nodeContentByTag(c, 'Description'),
+                act = this.activityByCode(
+                    addOne(nodeContentByTag(c, 'FunctionIDNr'))),
+                asp = this.addAspect(name + mark);
+            if(asp) {
+              asp.setCode();
+              asp.resize();
+              if(desc && desc !== 'null') asp.comments = desc;
+              corpits[tag][asp.identifier] = act;
+            }            
+          }
+        }
+      }
+    }
+    // Infer links from the CORPIT index by looking for function pairs
+    // (F1, F2) where F1 has aspect A as output and F2 has it as some
+    // incoming aspect. Do this by iterating only over the outputs (so
+    // orphan incoming aspects will be ignored).
+    for(let k in corpits.Output) if(corpits.Output.hasOwnProperty(k)) {
+      const fa = corpits.Output[k];
+      for(let i = 0; i < tags.length; i++) if(tags[i] !== 'Output') {
+        const ta = corpits[tags[i]][k];
+        if(ta) {
+          const
+              c = tags[i].charAt(0),
+              l = this.addLink(fa, ta, c),
+              a = this.aspects[k];
+          // Add aspect (if indeed defined) to link (if indeed created).
+          if(l && a) addDistinct(a, l.aspects);
+        }
+      }
+    }
+    this.focal_activity = this.top_activity;
   }
   
   get listOfAllComments() {
@@ -1573,10 +1695,9 @@ class NodeBox extends ObjectWithXYWH {
   }
   
   get identifier() {
-    // Preserve names starting with an underscore (typically system variables)
-    if(this.name.startsWith('_')) return UI.nameToID(this.name);
-    // Otherwise, interpret underscores as hard spaces
-    return UI.nameToID(this.displayName);
+    let id = this.name;
+    if(this.hasActor) id += ` (${this.actor.name})`;
+    return UI.nameToID(id);
   }
   
   get numberContext() {

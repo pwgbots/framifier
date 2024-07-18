@@ -779,6 +779,11 @@ function parseLetterCode(lc) {
   return n;
 }
 
+function addOne(id) {
+  // Return integer value of string `id` plus 1 as a string.
+  return (safeStrToInt(id) + 1).toString();
+}
+
 function randomID() {
   // Generates a 22+ hex digit ID: timestamp plus 12 random bits as suffix
   // plus 8 more random hex digits (earlier shorter version caused doubles!)
