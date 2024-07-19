@@ -1399,12 +1399,14 @@ class diaFRAMModel {
   }
 
   resetExpressions() {
-    // Create a new vector for all expression attributes of all model
-    // entities, using the appropriate default value.
+    // Create a new vector for all expressions in the model, setting their
+    // initial value (t=0) to "undefined" and for all other cycles ("ticks")
+    // to "not computed".
     const ax = this.allExpressions;
     for(let i = 0; i < ax.length; i++) {
-      ax[i].reset(0);
+      ax[i].reset(VM.UNDEFINED);
     }
+    //
     for(let k in this.activities) if(this.activities.hasOwnProperty(k)) {
       const s = this.activities[k].state;
       for(let c in s) if(s.hasOwnProperty(c)) {
@@ -1915,7 +1917,7 @@ class Activity extends NodeBox {
     this.notes = [];
     this.predecessors = [];
     // The state of an activity comprises one vector per connector.
-    this.state = {C: [], O: [], R: [], P: [], I: [], T: [], A: []};
+    this.state = {C: [], O: [], R: [], P: [], I: [], T: []};
   }
   
   get type() {
@@ -2164,7 +2166,33 @@ class Activity extends NodeBox {
     }
     return ia;
   }
+  
+  stateChanged(t) {
+    // Return TRUE if any of the aspects has changed compared to tick t-1.
+    let change = false;
+    for (let k in this.state) if('CORPIT'.indexOf(k) > 0) {
+      const
+          ps = (t <= 0 ? null : this.state[k][t - 1]),
+          cs = this.state[k][t];
+      if(cs !== ps) {
+        change = true;
+        break;
+      }
+    }
+    return change;
+  }
 
+  activated(t) {
+    // Return TRUE iff O aspect is TRUE for tick t but not for tick t-1.
+    return (MODEL.solved && this.state.O[t] <= VM.EXCEPTION &&
+        (t === 0 || !this.state.O[t - 1]));
+  }
+  
+  isActive(t) {
+    return (MODEL.solved && this.state.O[t] < VM.EXCEPTION &&
+        this.state.O[t] > VM.EXCEPTION && this.state.O[t] !== 0);
+   }
+  
   containsActivity(a) {
     // Return the subactivity of this activity that contains activity `a`,
     // or NULL.
@@ -2430,40 +2458,65 @@ class Activity extends NodeBox {
     return nn;
   }
   
-  updateState() {
-    console.log('HERE state', this.displayName, this.state, MODEL.t);
+  updateState(t) {
+    // Determine whether this activity is "active" in the current cycle
+    // ("tick" t).
+    if(t > 0) console.log('HERE state', this.displayName, VM.sig4Dig(this.state.O[t - 1]), t);
     const
-        t = MODEL.t,
         s = this.state,
         ix = this.incoming_expressions;
+    // First calculate the expressions (if any) associated with the CRPIT
+    // of this activity.
     for(let k in ix) if(ix.hasOwnProperty(k)) {
-      let r = ix[k].result(t);
-console.log('HERE r =', r);
-      if(r === VM.UNDEFINED) {
-        console.log('HERE conn[k]', k, this.connections[k]);
-      }
-      s[k][t] = r;
+      s[k][t] = ix[k].result(t);
     }
-    for(let k in s) if(s.hasOwnProperty(k)) {
-      if(s[k][t] > VM.EXCEPTION) {
-        // No incoming expression => check incoming link aspects.
-        let allset = true;
-        for(let i = 0; i < this.connections[k].length; i++) {
-          const l = this.connections[k][i];
-          console.log('HERE', l.displayName);
-          let cset = 0;
-          for(let j = 0; j < l.aspects.length; j++) {
-            cset += l.aspects[j].expression.result(MODEL.t);
+    // If tick > 0, again consider all CRPIT to apply the default rules
+    // if their state is still "not computed" or "undefined".
+    if(t > 0) {
+      for(let k in s) if('CRPIT'.indexOf(k) >= 0) {
+console.log('HERE t k s[k,t]', t, k, s[k][t-1], 'for', this.displayName);
+        if(s[k][t - 1] > VM.EXCEPTION) {
+          // No incoming expression => check incoming link aspects. When
+          // multiple links are incoming for this aspect, they must *all*
+          // "satisfy" by having at least 1 TRUE associated aspect value. 
+          let allset = true;
+          for(let i = 0; i < this.connections[k].length; i++) {
+            const
+                l = this.connections[k][i],
+                fa = l.from_activity;
+  console.log('HERE link from', fa.displayName, 't', t, 'state[t]', fa.state.O[t - 1]);
+            // When the FROM activity is active, calculate all aspects on
+            // this link, and assume that one non-zero result (TRUE) suffices
+            // to "satisfy" this incoming link.
+            if(fa.isActive(t - 1)) {
+              let cset = 0;
+              for(let j = 0; j < l.aspects.length; j++) {
+                // NOTE: Aspects are calculated for "tick" t, not t-1.
+                const r = l.aspects[j].expression.result(t);
+                cset += (r > VM.ERROR && r < VM.EXCEPTION ? r : 0);
+              }
+              allset = allset && cset > 0;
+            } else {
+              // FROM activity not active => this incoming link not satisfied.
+              allset = false;
+            }
           }
-          allset = allset && cset > 0;
+          // The state for CRPT is TRUE if all links are "satisfied" even
+          // when there are no incoming links. For I, there *must* be at
+          // least one incoming link unless this is an "entry" activity.
+          s[k][t] = (allset && (k !== 'I' || this.isEntry) ? 1 : 0);
+          console.log('HERE k s[k,t]', k, s[k][t]);
         }
-        s[k][t] = (allset ? 1 : 0);
       }
     }
+    // This activity is considered "active" when all CRPITs are satisfied.
     if(s.C[t] && s.R[t] && s.P[t] && s.I[t] && s.T[t]) {
-      s.A[t] = true;
-      console.log('Stat is TRUE', this.displayName);
+      s.O[t] = 1;
+      console.log('HERE state is TRUE for', this.displayName);
+    } else {
+      s.O[t] = VM.UNDEFINED;
     }
+    return this.stateChanged(t);
   }
 
 } // END of class Activity
@@ -2575,6 +2628,21 @@ class Link {
     // Returns TRUE if this is a "deep link" comprising only a selected
     // link.
     return (this.deep_links.length === 1 && this.deep_links[0].selected);
+  }
+  
+  isActivated(t) {
+    return this.from_activity.activated(t - 1);
+  }
+
+  containsActivated(t) {
+    // Returns TRUE if this is a "deep link" comprising one or more
+    // activated links.
+    if(!this.deep_links.length) return this.isActivated(t);
+    let ca = false;
+    for(let i = 0; i < this.deep_links.length; i++) {
+      if(this.deep_links[i].isActivated(t)) ca = true;
+    }
+    return ca;
   }
 
   get containsFeedback() {

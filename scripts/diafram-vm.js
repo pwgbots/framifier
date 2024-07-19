@@ -4,8 +4,8 @@ Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
 This JavaScript file (diafram-vm.js) defines the classes and functions that
-implement the arithmetical expressions for entity attributes, and the Virtual
-Machine (VM) that executes a diaFRAM model.
+implement the Virtual Machine that calculates arithmetical expressions for
+system aspects and activity states when a diaFRAM model is run.
 */
 /*
 Copyright (c) 2024 Delft University of Technology
@@ -51,9 +51,8 @@ class Expression {
     this.is_static = true;
     // NOTE: VM expects result to be an array, even when expression is static.
     this.vector = [VM.NOT_COMPUTED];
-    // Special instructions can store results as cache properties to save
-    // (re)computation time; cache is cleared when expression is reset.
-    this.cache = {};
+    // Simulation clock time set points.
+    this.time_after = false;
   }
   
   get variableName() {
@@ -173,7 +172,7 @@ class Expression {
     if(!this.compiled) return false;
     // Compute static expressions as if t = 0.
     if(t < 0 || this.isStatic) t = 0;
-    // Select the vector to use.
+    // Results are stored as a vector.
     const v = this.vector;
     // Check for potential error (that should NOT occur).
     if(!Array.isArray(v) || v.length === 0 || t >= v.length) {
@@ -191,6 +190,11 @@ class Expression {
       if(DEBUGGING) console.log('Already computed', this.variableName,
           ':', this.text, '@', t, v[t]);
       return true;
+    }
+    // Clear the AFTER setpoint if simulated time has passed beyond this
+    // setpoint.
+    if(this.time_after !== false) {
+      if(MODEL.clock_time[t] >= this.time_after) this.time_after = false;
     }
     // Push this expression onto the call stack.
     VM.call_stack.push(this);
@@ -225,8 +229,11 @@ class Expression {
     } else {
       v[t] = this.stack.pop();
     }
+    // Now check the AFTER setpoint, as it may have been set by this
+    // expression, and then the result should be "PENDING".
+    if(this.time_after !== false) v[t] = VM.PENDING;
     this.trace('RESULT = ' + VM.sig4Dig(v[t]));
-    // Store wildcard result also in "normal" vector
+    // Store result in the vector.
     this.vector[t] = v[t];
     // Pop the time step.
     this.step.pop();
@@ -979,102 +986,33 @@ class VirtualMachine {
     
     this.call_stack = [];
     this.issue_list = [];
+    this.after_setpoints = [];
 
-    // Floating-point constants used in calculations
-    // Meaningful solver results are assumed to lie wihin reasonable bounds.
-    // Extreme absolute values (10^25 and above) are used to signal particular
-    // outcomes.
-    this.SOLVER_PLUS_INFINITY = 1e+25;
-    this.SOLVER_MINUS_INFINITY = -1e+25;
-    this.BEYOND_PLUS_INFINITY = 1e+35;
-    this.BEYOND_MINUS_INFINITY = -1e+35;
+    // Floating-point constants used in calculations.
+
     // The VM properties "PLUS_INFINITY" and "MINUS_INFINITY" are used
-    // when evaluating expressions. These propeties may be changed for
-    // diagnostic purposes -- see below.
+    // when evaluating expressions.
     this.PLUS_INFINITY = 1e+25;
     this.MINUS_INFINITY = -1e+25;
     // Expression results having an infinite term may be less than infinity,
     // but still exceptionally high, and this should be shown.
     this.NEAR_PLUS_INFINITY = this.PLUS_INFINITY / 200;
     this.NEAR_MINUS_INFINITY = this.MINUS_INFINITY / 200;
-    // As of version 1.8.0, Linny-R imposes no +INF bounds on processes
-    // unless diagnosing an unbounded problem. For such diagnosis, the
-    // (relatively) low value 9.999999999e+9 is used.
-    this.DIAGNOSIS_UPPER_BOUND = 9.999999999e+9;
     // NOTE: Below the "near zero" limit, a number is considered zero
     // (this is to timely detect division-by-zero errors).
     this.NEAR_ZERO = 1e-10;
-    // Use a specific constant smaller than near-zero to denote "no cost"
-    // to differentiate "no cost" form cost prices that really are 0.
-    this.NO_COST = 0.987654321e-10;
-
-    // NOTE: Allow for an accuracy margin: stocks may differ 0.1%  from
-    // their target without displaying them in red or blue to signal
-    // shortage or surplus.
-    this.SIG_DIF_LIMIT = 0.001;
     // Numbers near zero are displayed as +0 or -0.
     this.SIG_DIF_FROM_ZERO = 5e-5;
-    // ON/OFF threshold is used to differentiate between level = 0 and
-    // still "ON" (will be displayed as +0).
-    this.ON_OFF_THRESHOLD = 1.5e-4;
-    // Limit for upper bounds beyond which binaries cannot be computed
-    // correctly. Modeler is warned when this occurs (typically when
-    // ON/OFF variables are needed for a process having infinite bounds.
-    this.MEGA_UPPER_BOUND = 1e6;
-    // Limit slack penalty to one order of magnitude below +INF.
-    this.MAX_SLACK_PENALTY = 0.1 * this.PLUS_INFINITY;
   
-    // VM constants for specifying the type of cash flow operation.
-    this.CONSUME = 0;
-    this.PRODUCE = 1;
-    this.ONE_C = 2;
-    this.TWO_X = 3;
-    this.THREE_X = 4;
-    this.SPIN_RES = 5;
-    this.PEAK_INC = 6;
-    // Array of corrsponding strings for more readable debugging information.
-    this.CF_CONSTANTS = ['CONSUME', 'PRODUCE', 'ONE_C', 'TWO_X',
-        'THREE_X', 'SPIN_RES'];
-    
-    // Link multiplier type numbers.
-    // NOTE: Do *NOT* change existing values, as this will cause legacy issues!
-    this.LM_LEVEL = 0; // No symbol
-    this.LM_THROUGHPUT = 1; // Symbol: two parallel right-pointing arrows
-    this.LM_INCREASE = 2; // Symbol: Delta
-    this.LM_SUM = 3; // Symbol: Sigma
-    this.LM_MEAN = 4; // Symbol: mu
-    this.LM_STARTUP = 5; // Symbol: thick chevron up
-    this.LM_POSITIVE = 6; // Symbol: +
-    this.LM_ZERO = 7; // Symbol: 0
-    this.LM_SPINNING_RESERVE = 8; // Symbol: left-up curved arrow
-    this.LM_FIRST_COMMIT = 9; // Symbol: hollow asterisk
-    this.LM_SHUTDOWN = 10; // Symbol: thick chevron down
-    this.LM_PEAK_INC = 11; // Symbol: plus inside triangle ("peak-plus")
-    this.LM_AVAILABLE_CAPACITY = 12; // Symbol: up-arrow with baseline
-    // List of link multipliers that require binary ON/OFF variables
-    this.LM_NEEDING_ON_OFF = [5, 6, 7, 8, 9, 10];
-    this.LM_SYMBOLS = ['', '\u21C9', '\u0394', '\u03A3', '\u03BC', '\u25B2',
-        '+', '0', '\u2934', '\u2732', '\u25BC', '\u2A39', '\u21A5'];
-    this.LM_LETTERS = ' TDSMU+0RFDPA';
-    
     // VM max. expression stack size.
     this.MAX_STACK = 200;
 
-    // Base penalty of 10 is high relative to the (scaled) coefficients of
-    // the cash flows in the objective function (typically +/- 1).
-    this.BASE_PENALTY = 10;
-    // Peak variable penalty is added to make solver choose the *smallest*
-    // value that is greater than or equal to X[t] for all t as "peak value".
-    // NOTE: The penalty is expressed in the currency unit, so it will be
-    // divided by the cash scalar so as not to interfere with the optimal
-    // solution (highest total cash flow).
-    this.PEAK_VAR_PENALTY = 0.1;
-  
     // NOTE: The VM uses numbers >> +INF to denote special computation results.
     this.EXCEPTION = 1e+36; // to test for any exceptional value
-    this.UNDEFINED = 1e+37; // to denote "unspecified by the user"
-    this.NOT_COMPUTED = 1e+38; // initial value for VM variables (to distinguish from UNDEFINED)
-    this.COMPUTING = 1e+39; // used by the VM to implement lazy evaluation
+    this.PENDING = 1e+37; // used by the VM to implement AFTER setpoints
+    this.UNDEFINED = 1e+38; // to denote "unspecified by the user"
+    this.NOT_COMPUTED = 1e+39; // initial value for VM variables (to distinguish from UNDEFINED)
+    this.COMPUTING = 1e+40; // used by the VM to implement lazy evaluation
   
     // NOTES:
     // (1) Computation errors are signalled by NEGATIVE values << -10^35.
@@ -1097,23 +1035,11 @@ class VirtualMachine {
     this.error_codes = [
       this.ERROR, this.CYCLIC, this.DIV_ZERO, this.BAD_CALC, this.ARRAY_INDEX,
       this.BAD_REF, this.UNDERFLOW, this.OVERFLOW, this.INVALID, this.PARAMS,
-      this.UNKNOWN_ERROR, this.UNDEFINED, this.NOT_COMPUTED, this.COMPUTING];
+      this.UNKNOWN_ERROR, this.UNDEFINED, this.NOT_COMPUTED, this.COMPUTING,
+      this.PENDING];
     
     // Prefix for warning messages that are logged in the monitor.
     this.WARNING = '-- Warning: ';
-
-    // Solver constants indicating constraint type.
-    // NOTE: These correspond to the codes used in the LP format. When
-    // generating MPS files, other constants are used.
-    this.FR = 0;
-    this.LE = 1;
-    this.GE = 2;
-    this.EQ = 3;
-    this.ACTOR_CASH = 4;
-    
-    this.constraint_codes = ['FR', 'LE', 'GE', 'EQ'];
-    this.constraint_symbols = ['', '<=', '>=', '='];
-    this.constraint_letters = ['N', 'L', 'G', 'E'];
 
     // Standard time unit conversion to hours (NOTE: ignore leap years).
     this.time_unit_values = {
@@ -1128,10 +1054,6 @@ class VirtualMachine {
       'year': 'yr', 'week': 'wk', 'day': 'd',
       'hour': 'h', 'minute': 'm', 'second': 's'
     };
-    // Number of rounds limited to 31 because JavaScript performs bitwise
-    // operations on 32 bit integers, and the sign bit may be troublesome.
-    this.max_rounds = 31;
-    this.round_letters = '?abcdefghijklmnopqrstuvwxyzABCDE';
     // Standard 1-letter codes for diaFRAM entities.
     this.entity_names = {
       A: 'actor',
@@ -1176,6 +1098,8 @@ class VirtualMachine {
     this.issue_index = -1;
     UI.updateIssuePanel();
     this.messages.length = 0;
+    // Clear AFTER setpoint list.
+    this.after_setpoints.lenth = 0;
     // Reset the (graphical) controller.
     MONITOR.reset();
     this.t = 0;
@@ -1231,8 +1155,8 @@ class VirtualMachine {
     // NOTE: The prettier circled bold X 2BBF does not display on macOS !!
     if(n >= this.NOT_COMPUTED) return [true, '\u2297']; // Circled X
     if(n >= this.UNDEFINED) return [true, '\u2047']; // Double question mark ??
+    if(n >= this.PENDING) return [true, '\u29D6']; // Stylized hourglass
     if(n >= this.NEAR_PLUS_INFINITY) return [true, '\u221E'];
-    if(n === this.NO_COST) return [true, '\u00A2']; // c-slash (cent symbol)
     return [false, n];
   }
   
@@ -1246,7 +1170,7 @@ class VirtualMachine {
     if(sv[0]) return sv[1];
     const a = Math.abs(n);
     // Signal small differences from true 0 by leading + or - sign.
-    if(n !== 0 && a <= this.ON_OFF_THRESHOLD) return n > 0 ? '+0' : '-0';
+    if(n !== 0 && a <= this.SIG_DIF_FROM_ZERO) return n > 0 ? '+0' : '-0';
 /* 
     if(a >= 9999.5) return n.toPrecision(2);
     if(Math.abs(a-Math.round(a)) < 0.05) return Math.round(n);
@@ -1275,7 +1199,7 @@ class VirtualMachine {
     if(a === 0) return 0;
     // Signal small differences from exactly 0 by a leading + or - sign
     // except when the `tiny` flag is set.
-    if(a <= this.ON_OFF_THRESHOLD && !tiny) return n > 0 ? '+0' : '-0';
+    if(a <= this.SIG_DIF_FROM_ZERO && !tiny) return n > 0 ? '+0' : '-0';
 /*
     if(a >= 9999.5) return n.toPrecision(4);
     if(Math.abs(a-Math.round(a)) < 0.0005) return Math.round(n);
@@ -1366,19 +1290,6 @@ class VirtualMachine {
     return (this.time_stamp - ts) / 1000;
   }
   
-  checkForInfinity(n) {
-    // Return floating point number `n`, or +INF or -INF if the absolute
-    // value of `n` is relatively (!) close to the VM infinity constants
-    // (since the solver may return imprecise values of such magnitude).
-      if(n > 0.5 * VM.PLUS_INFINITY && n < VM.BEYOND_PLUS_INFINITY) {
-      return VM.PLUS_INFINITY;
-    } 
-    if(n < 0.5 * VM.MINUS_INFINITY && n > VM.BEYOND_MINUS_INFINITY) {
-      return VM.MINUS_INFINITY;
-    }
-    return n;
-  }
-
   severestIssue(list, result) {
     // Returns severest exception code or +/- INFINITY in `list`, or the
     // result of the computation that involves the elements of `list`.
@@ -1395,17 +1306,40 @@ class VirtualMachine {
   }
   
   solveModel() {
-    // Perform successive "cycles" until no more changes occur.
+    // Perform successive "cycles" for the set run length.
     // First establish the most logical function sequence.
     const seq = MODEL.triggerSequence;
-    console.log('HERE seq');
-    for(let k in seq) if(seq.hasOwnProperty(k)) {
-      const s = seq[k];
-      for(let i = 0; i < s.length; i++) {
-        console.log('HERE', s[i].displayName);
-        s[i].updateState();
+    // Then iterate throught the simulation period.
+    for(let i = 0; i <= MODEL.run_length; i++) {
+      VM.t = i;
+      if(i > 0) {
+        if(this.after_setpoints.length) {
+          // Advance to the next relevant point in time, and remove it
+          // from the list of AFTER setpoints.
+          this.after_setpoints.sort();
+          MODEL.clock_time[i] = this.after_setpoints.shift() / 360000;
+        } else {
+          // Time does not advance.
+          MODEL.clock_time[i] = MODEL.clock_time[i - 1];
+        }
+      }
+      for(let k in seq) if(seq.hasOwnProperty(k)) {
+        const s = seq[k];
+        let change = false;
+        for(let j = 0; j < s.length; j++) {
+          const uas = s[j].updateState(VM.t);
+console.log('HERE change ?', s[j].displayName, uas);
+          change = change || uas;
+        }
+        // Do not proceed to the next "layer" when a state change has
+        // occurred.
+console.log('HERE i k change', i, k, change);
+        if(change) break;
       }
     }
+    MODEL.solved = true;
+    this.stopSolving();
+    UI.drawDiagram(MODEL);
   }
   
   calculateDependentVariables(block) {
@@ -1416,14 +1350,6 @@ class VirtualMachine {
         `Calculating dependent variables took ${this.elapsedTime} seconds.\n`);
   }
   
-  showSetUpProgress(next_start, abl) {
-    if(this.show_progress) {
-      // Display 1 more segment progress so that the bar reaches 100%
-      UI.setProgressNeedle((next_start + this.tsl) / abl);
-    }
-    setTimeout((t, n) => { VM.addTableauSegment(t, n); }, 0, next_start, abl);
-  }
-
   hideSetUpOrWriteProgress() {
     this.show_progress = false;
     UI.setProgressNeedle(0);
@@ -1452,19 +1378,6 @@ class VirtualMachine {
       if(!s.startsWith('(')) s = '(' + s + ')';
       console.log((i + '').padStart(3, '0') + ':  ' + vmi[0].name + s);
     }
-  }
-  
-  showMPSProgress(next_col, ncol) {
-    if(VM.halted) {
-      this.hideSetUpOrWriteProgress();
-      this.stopSolving();
-      return;
-    }
-    if(this.show_progress) {
-      // NOTE: Display 1 block more progress, or the bar never reaches 100%.
-      UI.setProgressNeedle((next_col + this.cbl) / ncol);
-    }
-    setTimeout((c, n) => VM.writeMPSColumns(c, n), 0, next_col, ncol);
   }
   
   stopSolving() {
@@ -1518,9 +1431,11 @@ function VMI_push_time_step(x) {
 
 function VMI_push_clock_time(x) {
   // Push the simulated clock time (in hours).
-  const t = MODEL.clock_time; 
-  if(DEBUGGING) console.log('push clock time t = ' + t);
-  x.push(t);
+  const
+      t = x.step[x.step.length - 1], 
+      ct = MODEL.clock_time[t]; 
+  if(DEBUGGING) console.log('push clock time t = ' + ct);
+  x.push(ct);
 }
 
 function VMI_push_random(x) {
@@ -1530,32 +1445,31 @@ function VMI_push_random(x) {
   x.push(r);
 }
 
-function VMI_wait_until(x) {
-  // Advance the simulated clock time to the stack top, and return the
-  // new time, or 0 if X is less than the current time.
-  const d = x.top();
+function VMI_after(x) {
+  // Pop the stack top value T. If T > NOW and the AFTER setpoint of
+  // expression `x` equals FALSE, set this AFTER setpoint to T, and
+  // return FALSE. If T <= NOW, clear the AFTER setpoint, and return TRUE.
+  // When the AFTER setpoint of expression `x` equals T, the `x` will
+  // evaluate as "PENDING" as long as NOW < T, and when the simulated
+  // time reaches the set point in time, the setpoint is cleared and
+  // `x` returns evaluates "normally" again (and will execute this AFTER
+  // instruction again).
+  // The Virtual Machine keeps track of setpoints and will advance the
+  // simulated time clock after completing cycle to the earliest setpoint.
+  const
+      t = x.step[x.step.length - 1],
+      ct = MODEL.clock_time[t],
+      d = x.top();
   if(d !== false) {
-    if(DEBUGGING) console.log(`WAIT UNTIL ${d} (clock time: ${MODEL.clock_time})`);
-    if(d < MODEL.clock_time) {
-      x.retop(0);      
+    if(DEBUGGING) console.log(`AFTER ${d} (clock time: ${ct})`);
+    if(d <= ct) {
+      x.retop(1);
+      x.time_after = false;
     } else {
-      MODEL.clock_time = d;
-      x.retop(MODEL.clock_time);
-    }
-  }
-}
-
-function VMI_wait(x) {
-  // Advance the simulated clock time by the value on the stack top (if >= 0),
-  // and return the new time, or 0 if X has a negative value.
-  const d = x.top();
-  if(d !== false) {
-    if(DEBUGGING) console.log(`WAIT ${d} (clock time: ${MODEL.clock_time})`);
-    if(d < 0) {
-      x.retop(0);      
-    } else {
-      MODEL.clock_time += d;
-      x.retop(MODEL.clock_time);
+      x.retop(0);
+      x.time_after = d;
+      // NOTE: points in time are stored as integers (1/100 second)
+      addDistinct(Math.floor(d * 360000), VM.after_setpoints); 
     }
   }
 }
@@ -2481,17 +2395,17 @@ const
       VMI_push_pi, VMI_push_infinity, VMI_push_contextual_number,
       VMI_push_year, VMI_push_week, VMI_push_day, VMI_push_hour,
       VMI_push_minute, VMI_push_second],
-  DYNAMIC_SYMBOLS = ['c', 'now', 'random', 'wait', 'waituntil'],
+  DYNAMIC_SYMBOLS = ['c', 'now', 'random', 'after'],
   MONADIC_OPERATORS = [
       '~', 'not', 'abs', 'sin', 'cos', 'atan', 'ln',
       'exp', 'sqrt', 'round', 'int', 'fract', 'min', 'max',
       'binomial', 'exponential', 'normal', 'poisson', 'triangular',
-      'weibull', 'waituntil', 'wait'],
+      'weibull', 'after'],
   MONADIC_CODES = [
       VMI_negate, VMI_not, VMI_abs, VMI_sin, VMI_cos, VMI_atan, VMI_ln,
       VMI_exp, VMI_sqrt, VMI_round, VMI_int, VMI_fract, VMI_min, VMI_max,
       VMI_binomial, VMI_exponential, VMI_normal, VMI_poisson, VMI_triangular,
-      VMI_weibull, VMI_wait_until, VMI_wait],
+      VMI_weibull, VMI_after],
   DYADIC_OPERATORS = [
       ';', '?', ':', 'or', 'and',
       '=', '<>', '!=',
@@ -2514,7 +2428,7 @@ const
   OPERATORS = DYADIC_OPERATORS.concat(MONADIC_OPERATORS), 
   OPERATOR_CODES = DYADIC_CODES.concat(MONADIC_CODES),
   PRIORITIES = [1, 2, 2, 3, 4, 5, 5, 5, 5, 5, 5, 5, 6, 6, 7, 7, 7, 8, 8, 10,
-      9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+      9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
   ACTUAL_SYMBOLS = CONSTANT_SYMBOLS.concat(OPERATORS),
   SYMBOL_CODES = CONSTANT_CODES.concat(OPERATOR_CODES);
 

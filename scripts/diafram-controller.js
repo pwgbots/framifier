@@ -970,11 +970,9 @@ class GUIController {
   
   stopSolving() {
     // Reset solver-related GUI elements and notify modeler.
-    super.stopSolving();
     this.buttons.solve.classList.remove('off');
     this.buttons.stop.classList.remove('blink');
     this.buttons.stop.classList.add('off');
-    this.rotatingIcon(false);
     // Update the time step on the status bar.
     this.updateTimeStep();
   }

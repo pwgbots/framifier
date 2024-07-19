@@ -384,6 +384,9 @@ class Paper {
     id = 'f_e_e_d_b_a_c_k__c_h_e_v_r_o_n__t_i_p__ID*';
     this.feedback_chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 8, 'rgb(0, 0, 0)');
+    id = 'g_r_e_e_n__c_h_e_v_r_o_n__t_i_p__ID*';
+    this.green_chevron = `url(#${id})`;
+    this.addMarker(defs, id, chev, 8, 'rgb(64, 176, 64)');
     id = 'd_e_e_p__c_h_e_v_r_o_n__t_i_p__ID*';
     this.deep_chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 10, 'rgb(128, 128, 144)');
@@ -405,6 +408,12 @@ class Paper {
     id = 't_a_r_g_e_t__ID*';
     this.target_filter = `filter: url(#${id})`;
     this.addShadowFilter(defs, id, 'rgb(250,125,0)', 8);
+    id = 'a_c_t_i_v_a_t_e_d__ID*';
+    this.activated_filter = `filter: url(#${id})`;
+    this.addShadowFilter(defs, id, 'rgb(0,255,0)', 12);
+    id = 'a_c_t_i_v_e__l_i_n_k__ID*';
+    this.active_link_filter = `filter: url(#${id}); opacity: 1`;
+    this.addShadowFilter(defs, id, 'rgb(0,255,0)', 10);
     this.svg.appendChild(defs);
     this.changeFont(CONFIGURATION.default_font_name);
   }
@@ -961,7 +970,8 @@ class Paper {
     const
         vn = l.visibleNodes,
         // Link is dashed when it has no assiciated aspects.
-        sda = (l.aspects.length ? 'none' : UI.sda.dash);
+        sda = (l.aspects.length ? 'none' : UI.sda.dash),
+        activated = l.containsActivated(MODEL.t);
     // Double-check: do not draw unless both activities are visible.
     if(!vn[0] || !vn[1]) {
       const cdl = this.comprisingDeepLink(l);
@@ -980,7 +990,10 @@ class Paper {
       ady = 4;
     } else {
       stroke_width = 1.25;
-      if(l.is_feedback || l.containsFeedback) {
+      if(activated) {
+        stroke_color = '#60b060';
+        chev = this.green_chevron;
+      } else if(l.is_feedback || l.containsFeedback) {
         stroke_color = 'black';
         chev = this.feedback_chevron;
       } else {
@@ -1076,16 +1089,21 @@ class Paper {
       // so they are always depicted in gray.
       // @@@ TO DO: Use color when active.
       stroke_width = 2.5;
-      stroke_color = '#808090';
+      stroke_color = (activated ? '#60b060' : '#808090');
       chev = this.deep_chevron;
       opac = 0.75;
       // @@@ set onmouseover and mouseout so that it displays its links.
     }
-    l.shape.addPath(
+    const tl = l.shape.addPath(
         [`M${x1},${y1}C${fcx},${fcy},${tcx},${tcy},${x2},${y2}`],
         {fill: 'none', stroke: stroke_color, 'stroke-width': stroke_width,
             'stroke-dasharray': sda, 'stroke-linecap': 'round',
             'marker-end': chev, opacity: opac});
+    if(activated) {
+      // Highlight arrow if FROM acitivy was activated in the previous
+      // cycle.
+      tl.setAttribute('style', this.active_link_filter);
+    }
     if(l.aspects.length) {
       const
           firstRealLinkWithAspect = (a) => {
@@ -1147,7 +1165,7 @@ class Paper {
               by = bp[1];
           l.shape.addRect(bx, by, bw, bh,
               {stroke: '#80a0ff', 'stroke-width': 0.5, fill: '#d0f0ff'});
-          if(Math.abs(r) >= -VM.ERROR) {
+          if(r <= VM.ERROR || r >= VM.EXCEPTION) {
             l.shape.addNumber(bx, by, s,
                 {'font-size': 9, 'fill': this.palette.VM_error});
           } else {
@@ -1182,6 +1200,11 @@ class Paper {
         stroke_color = this.palette.rim,
         fill_color = (background ? this.palette.bg_fill :
             this.palette.fg_fill);
+    // Active states have a dark green rim.
+    if(MODEL.solved && act.isActive(MODEL.t)) {
+      stroke_width = 1.5;
+      stroke_color = `rgb(0, ${Math.max(64, 160 - MODEL.t)}, 48)`;
+    }
     // Being selected overrules special border properties except SDA
     if(act.selected) {
       stroke_color = this.palette.select;
@@ -1244,7 +1267,9 @@ class Paper {
     }
     // Highlight shape if needed.
     let filter = '';
-    if(act === UI.target_activity) {
+    if(act.activated(MODEL.t)) {
+      filter = this.activated_filter;
+    } else if(act === UI.target_activity) {
       filter = this.target_filter;
     } else if(DOCUMENTATION_MANAGER.visible && act.comments) {
       filter = this.documented_filter;
