@@ -580,6 +580,8 @@ class GUIController {
     MODEL.clearSelection();
     this.clearStatusLine();
     this.drawDiagram(MODEL);
+    MODEL.t = 0;
+    UI.updateTimeStep();
   }
 
   get color() {
@@ -675,8 +677,7 @@ class GUIController {
             UI.updateButtons();
           }
         });
-    this.buttons.solve.addEventListener('click',
-        (event) => VM.solveModel(event.altKey));
+    this.buttons.solve.addEventListener('click', () => VM.solveModel());
     this.buttons.stop.addEventListener('click', () => VM.halt());
     this.buttons.reset.addEventListener('click', () => UI.resetModel());
 
@@ -940,32 +941,19 @@ class GUIController {
     }
   }
   
-  clockTime(secs=true) {
-    // Returns real number `hrs` as dd hh:mm:ss where dd is the number of
+  clockTime(hrs, secs=true) {
+    // Return real number `hrs` as dd hh:mm:ss where dd is the number of
     // days, and the seconds :ss are omitted when `secs` is FALSE.
-    const
-        hrs = MODEL.simulationTime,
-        sv = VM.specialValue(hrs);
-    if(hrs < 0) return hrs.toPrecision(3);
+    const sv = VM.specialValue(hrs);
     if(sv[0]) return sv[1];
-    const
-        d = Math.floor(hrs / 24),
-        h = Math.floor(hrs - 24 * d),
-        m = Math.floor((hrs - 24 * d - h) * 60),
-        s = Math.floor(hrs * 60 % 1 * 60),
-        ds = (d ? d + 'd ' : ''),
-        hs = h.toString().padStart(2, '0'),
-        ms = m.toString().padStart(2, '0'),
-        ss = (secs ? ':' + s.toString().padStart(2, '0') : '');
-    return `${ds}${hs}:${ms}${ss}`;
+    return hoursToString(hrs, secs);
   }
 
   updateTimeStep(t=MODEL.t) {
     // Display cycle tick `t` as the current cycle number.
-    // NOTE: The Virtual Machine passes its relative time `VM.t`.
     document.getElementById('step').innerText = t;
     document.getElementById('clock-time').innerHTML =
-        `&#x231A;${this.clockTime()}`;
+        `&#x231A;${this.clockTime(MODEL.simulationTime)}`;
   }
   
   stopSolving() {
@@ -2176,9 +2164,6 @@ class GUIController {
         // alters the way in which the model file is saved.
         e.preventDefault();
         FILE_MANAGER.saveModel(e.shiftKey);
-      } else if(alt && code === 'KeyR') {
-        // Alt-R means: run to diagnose infeasible/unbounded problem.
-        VM.solveModel(true);
       } else if(alt && ['KeyC', 'KeyM'].indexOf(code) >= 0) {
         // Special shortcut keys for "clone selection" and "model settings".
         const be = new Event('click');
@@ -3107,8 +3092,8 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     md.element('name').value = model.name;
     md.element('author').value = model.author;
     md.element('grid-pixels').value = model.grid_pixels;
+    md.element('cycles').value = model.run_length;
     this.setBox('settings-align-to-grid', model.align_to_grid);
-    this.setBox('settings-block-arrows', model.show_block_arrows);
     md.show('name');
   }
   
@@ -3117,21 +3102,21 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     // Valdidate inputs
     const px = this.validNumericInput('settings-grid-pixels', 'grid resolution');
     if(px === false) return false;
+    const rl = this.validNumericInput('settings-cycles', 'run length');
+    if(rl === false) return false;
     model.name = md.element('name').value.trim();
     // Display model name in browser unless blank
     document.title = model.name || 'diaFRAM';
     model.author = md.element('author').value.trim();
-    // Some changes may necessitate redrawing the diagram
+    // Some changes may necessitate redrawing the diagram.
     let cb = UI.boxChecked('settings-align-to-grid'),
         redraw = !model.align_to_grid && cb;
     model.align_to_grid = cb;
     model.grid_pixels = Math.floor(px);
-    cb = UI.boxChecked('settings-block-arrows');
-    redraw = redraw || cb !== model.show_block_arrows;
-    model.show_block_arrows = cb;
-    // Close the dialog
+    model.run_length = Math.max(1, Math.floor(rl));
+    // Close the dialog.
     md.hide();
-    // Ensure that model documentation can no longer be edited
+    // Ensure that model documentation can no longer be edited.
     DOCUMENTATION_MANAGER.clearEntity([model]);
     if(redraw) this.drawDiagram(model);
   }

@@ -53,6 +53,7 @@ class Expression {
     this.vector = [VM.NOT_COMPUTED];
     // Simulation clock time set points.
     this.time_after = false;
+    this.after_points = [];
   }
   
   get variableName() {
@@ -81,21 +82,23 @@ class Expression {
     this.compute_issue = '';
     this.step.length = 0;
     this.stack.length = 0;
-    this.compile(); // if(!this.compiled)  REMOVED to ensure correct isStatic!! 
-    // Static expressions only need a vector with one element (having index 0)
+    this.time_after = false;
+    this.after_points.length = 0;
+    // Always compile so ast to ensure correct isStatic.
+    this.compile(); 
+    // Static expressions only need a vector with one element (having index 0).
     if(this.is_static) {
       // NOTE: Empty expressions (i.e., no text) may default to different
-      // values: typically 0 for lower bounds, infinite for upper process
-      // bounds, etc., so this value must be passed as parameter.
+      // values, so this value must be passed as parameter.
       this.vector.length = 1;
       if(this.text.length === 0) {
         this.vector[0] = default_value;
       } else {
-        // Initial values must be computed *lazily* just like any other value 
+        // Initial values must be computed *lazily* just like any other value.
         this.vector[0] = VM.NOT_COMPUTED;
       }
     } else {
-      // An array of appropriate length initialized as "not computed"
+      // An array of appropriate length initialized as "not computed".
       MODEL.cleanVector(this.vector, VM.NOT_COMPUTED);
     }
   }
@@ -115,15 +118,15 @@ class Expression {
       this.is_static = true;
       this.vector.length = 0;
       this.vector[0] = VM.INVALID;
-      // Report error on-screen to modeler
+      // Report error on-screen to modeler.
       UI.alert(`Syntax error in ${this.variableName}: ${xp.error}`);
     }
-    // Clear the "compiling" flag for this expression
+    // Clear the "compiling" flag for this expression.
     this.compiling = false;
   }
 
   get asXML() {
-    // Returns XML-encoded expression. 
+    // Return XML-encoded expression. 
     let text = this.text;
     return xmlEncoded(text);
   }
@@ -193,6 +196,7 @@ class Expression {
     }
     // Clear the AFTER setpoint if simulated time has passed beyond this
     // setpoint.
+    let on_the_dot = MODEL.clock_time[t] === this.time_after;
     if(this.time_after !== false) {
       if(MODEL.clock_time[t] >= this.time_after) this.time_after = false;
     }
@@ -231,7 +235,12 @@ class Expression {
     }
     // Now check the AFTER setpoint, as it may have been set by this
     // expression, and then the result should be "PENDING".
-    if(this.time_after !== false) v[t] = VM.PENDING;
+    if(on_the_dot) {
+      console.log('HERE on the dot');
+    } else if(this.time_after !== false) {
+      console.log('HERE ta v aspts', MODEL.clock_time[t], this.time_after, v[t], VM.after_setpoints);
+      v[t] = VM.PENDING;
+    }
     this.trace('RESULT = ' + VM.sig4Dig(v[t]));
     // Store result in the vector.
     this.vector[t] = v[t];
@@ -1099,7 +1108,7 @@ class VirtualMachine {
     UI.updateIssuePanel();
     this.messages.length = 0;
     // Clear AFTER setpoint list.
-    this.after_setpoints.lenth = 0;
+    this.after_setpoints.length = 0;
     // Reset the (graphical) controller.
     MONITOR.reset();
     this.t = 0;
@@ -1307,39 +1316,41 @@ class VirtualMachine {
   
   solveModel() {
     // Perform successive "cycles" for the set run length.
+    this.reset();
     // First establish the most logical function sequence.
     const seq = MODEL.triggerSequence;
+    this.t = 0;
     // Then iterate throught the simulation period.
-    for(let i = 0; i <= MODEL.run_length; i++) {
-      VM.t = i;
-      if(i > 0) {
+    while(this.t <= MODEL.run_length) {
+console.log('HERE t setpoints', this.t, this.after_setpoints.toString());
+      if(this.t > 0) {
         if(this.after_setpoints.length) {
           // Advance to the next relevant point in time, and remove it
           // from the list of AFTER setpoints.
           this.after_setpoints.sort();
-          MODEL.clock_time[i] = this.after_setpoints.shift() / 360000;
+          MODEL.clock_time[this.t] = this.after_setpoints.shift();
         } else {
           // Time does not advance.
-          MODEL.clock_time[i] = MODEL.clock_time[i - 1];
+          MODEL.clock_time[this.t] = MODEL.clock_time[this.t - 1];
         }
+console.log('HERE clock time vector', MODEL.clock_time.slice(0, this.t + 2));
       }
       for(let k in seq) if(seq.hasOwnProperty(k)) {
         const s = seq[k];
         let change = false;
         for(let j = 0; j < s.length; j++) {
           const uas = s[j].updateState(VM.t);
-console.log('HERE change ?', s[j].displayName, uas);
           change = change || uas;
         }
-        // Do not proceed to the next "layer" when a state change has
-        // occurred.
-console.log('HERE i k change', i, k, change);
-        if(change) break;
       }
+      // Increase the cycle "tick".
+      this.t++;
     }
     MODEL.solved = true;
     this.stopSolving();
+    MODEL.t = 0;
     UI.drawDiagram(MODEL);
+    UI.updateTimeStep();
   }
   
   calculateDependentVariables(block) {
@@ -1383,6 +1394,7 @@ console.log('HERE i k change', i, k, change);
   stopSolving() {
     this.stopTimer();
     UI.stopSolving();
+    UI.readyToReset();
   }
 
   halt() {
@@ -1460,17 +1472,23 @@ function VMI_after(x) {
       t = x.step[x.step.length - 1],
       ct = MODEL.clock_time[t],
       d = x.top();
+  if(true||DEBUGGING) {
+    console.log(`AFTER ${d} (clock time: ${ct}, setpoint: ${x.time_after})`);
+  }
   if(d !== false) {
-    if(DEBUGGING) console.log(`AFTER ${d} (clock time: ${ct})`);
     if(d <= ct) {
       x.retop(1);
       x.time_after = false;
+      x.after_points[t] = false;
     } else {
-      x.retop(0);
+      x.retop(1);
       x.time_after = d;
-      // NOTE: points in time are stored as integers (1/100 second)
-      addDistinct(Math.floor(d * 360000), VM.after_setpoints); 
+      x.after_points[t] = d;
+      // NOTE: Points in time are stored as floating point numbers.
+      addDistinct(d, VM.after_setpoints); 
+console.log('HERE setpoint added', VM.after_setpoints);
     }
+console.log('HERE x.after_points', x.object.displayName, x.after_points);
   }
 }
 

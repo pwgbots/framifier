@@ -68,10 +68,10 @@ function circledLetter(l) {
 }
 
 function safeStrToFloat(str, val=0) {
-  // Returns numeric value of floating point string, interpreting both
-  // dot and comma as decimal point
-  // NOTE: returns default value `val` if `str` is empty, null or undefined,
-  // or contains a character that is invalid in a number 
+  // Return numeric value of floating point string, interpreting both
+  // dot and comma as decimal point.
+  // NOTE: Return default value `val` if `str` is empty, null or undefined,
+  // or contains a character that is invalid in a number.
   if(!str || str.match(/[^0-9eE\.\,\+\-]/)) return val;
   str = str.replace(',', '.');
   const f = (str ? parseFloat(str) : val);
@@ -86,39 +86,25 @@ function safeStrToInt(str, val=0) {
   return (isNaN(n) ? val : n);
 }
 
-function rangeToList(str, max=0) {
-  // Parses ranges "n-m/i" into a list of integers
-  // Returns FALSE if range is not valid according to the convention below
-  // The part "/i" is optional and denotes the increment; by default, i = 1.
-  // The returned list will contain all integers starting at n and up to
-  // at most (!) m, with increments of i, so [n, n+i, n+2i, ...]
-  // If `str` contains only the "/i" part, the range is assumed to start at 0
-  // and end at `max`; if only one number precedes the "/i", this denotes the
-  // first number in the range, while `max` again defines the highest number
-  // that can be included
+function hoursToString(hrs, secs=true) {
+  // Return real number `hrs` as dd hh:mm:ss where dd is the number of
+  // days, and the seconds :ss are omitted when `secs` is FALSE.
+  // NOTE: A negative hour value is returned as such.
+  if(hrs < 0) return hrs.toPrecision(4);
   const
-      list = [],
-      ssep = str.split('/');
-  if(ssep.length > 2) return false;
-  let incr = (ssep.length === 2 ? parseInt(ssep[1]) : 1);
-  if(isNaN(incr)) return false;
-  let range = ssep[0].trim(),
-      first = 0,
-      last = max;
-  if(range.length > 0) {
-    range = range.split('-');
-    if(range.length > 2) return false;
-    first = parseInt(range[0]);
-    if(range.length === 2) last = parseInt(range[1]);
-    if(isNaN(first) || isNaN(last)) return false;
-  }
-  // Create the range number list
-  for(let i = first; i <= last; i += incr) list.push(i);
-  return list;
+      d = Math.floor(hrs / 24),
+      h = Math.floor(hrs - 24 * d),
+      m = Math.floor((hrs - 24 * d - h) * 60),
+      s = Math.floor(hrs * 60 % 1 * 60),
+      ds = (d ? d + 'd ' : ''),
+      hs = h.toString().padStart(2, '0'),
+      ms = m.toString().padStart(2, '0'),
+      ss = (secs ? ':' + s.toString().padStart(2, '0') : '');
+  return `${ds}${hs}:${ms}${ss}`;
 }
 
 function dateToString(d) {
-  // Returns date-time `d` in UTC format, accounting for time zone
+  // Return date-time `d` in UTC format, accounting for time zone.
   const offset = d.getTimezoneOffset();
   d = new Date(d.getTime() - offset * 60000);
   return d.toISOString().split('T')[0];

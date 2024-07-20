@@ -61,7 +61,7 @@ class diaFRAMModel {
     // Model settings.
     this.grid_pixels = 20;
     this.align_to_grid = true;
-    this.show_block_arrows = true;
+    this.run_length = 10;
     this.last_zoom_factor = 1;
     
     // Diagram editor related properties.
@@ -73,7 +73,6 @@ class diaFRAMModel {
     this.solved = false;
     // t is the time step ("tick") shown.
     this.t = 0;
-    this.run_length = 100;
     // Clock time is a vector with for each "tick" the clock time in hours.
     this.clock_time = [];
     this.cleanVector(this.clock_time, 0);
@@ -1093,7 +1092,7 @@ class diaFRAMModel {
     this.last_zoom_factor = safeStrToFloat(
         nodeParameterValue(node, 'zoom'), 1);
     this.align_to_grid = nodeParameterValue(node, 'align-to-grid') === '1';
-    this.show_block_arrows = nodeParameterValue(node, 'block-arrows') === '1';
+    this.run_length = safeStrToInt(nodeParameterValue(node, 'run-length'), 10);
     this.name = xmlDecoded(nodeContentByTag(node, 'name'));
     this.author = xmlDecoded(nodeContentByTag(node, 'author'));
     this.comments = xmlDecoded(nodeContentByTag(node, 'comments'));
@@ -1174,9 +1173,9 @@ class diaFRAMModel {
   get asXML() {
     let p = [' next-activity-number="', this.next_activity_number,
         '" next-aspect-number="', this.next_aspect_number,
-        '" zoom="', this.last_zoom_factor, '"'].join('');
+        '" zoom="', this.last_zoom_factor,
+        '" run-length="', this.run_length, '"'].join('');
     if(this.align_to_grid) p += ' align-to-grid="1"';
-    if(this.show_block_arrows) p += ' block-arrows="1"';
     let xml = this.xml_header + ['<model', p, '><name>',  xmlEncoded(this.name),
         '</name><author>', xmlEncoded(this.author),
         '</author><comments>', xmlEncoded(this.comments),
@@ -1408,10 +1407,13 @@ class diaFRAMModel {
     }
     //
     for(let k in this.activities) if(this.activities.hasOwnProperty(k)) {
-      const s = this.activities[k].state;
+      const
+          a = this.activities[k],
+          s = a.state;
       for(let c in s) if(s.hasOwnProperty(c)) {
         this.cleanVector(s[c], VM.UNDEFINED);
       }
+      a.active_since = -1;
     }
   }
 
@@ -1912,12 +1914,25 @@ class Activity extends NodeBox {
   constructor(parent, name, actor) {
     super(parent, name, actor);
     this.sub_activities = [];
-    this.connections = {C: [], O: [], R: [], P: [], I: [], T: []};
+    // Connections hold related links per aspect type.
+    this.connections = {};
+    // Connections hold optional expressions per CRPIT aspect type.
     this.incoming_expressions = {};
     this.notes = [];
     this.predecessors = [];
-    // The state of an activity comprises one vector per connector.
-    this.state = {C: [], O: [], R: [], P: [], I: [], T: []};
+    // The state of an activity comprises one vector per aspect type.
+    this.state = {};
+    for(let i = 0; i < 6; i++) {
+      const c = 'CORPIT'.charAt(i);
+      this.connections[c] = [];
+      this.state[c] = [];
+      if(c !== 'O') {
+        this.incoming_expressions[c] = new Expression(this, '');
+      }
+    }
+    // To visualize the time since last activation, the green rim color
+    // of activities turns gradually more black.
+    this.active_since = -1;
   }
   
   get type() {
@@ -2051,12 +2066,10 @@ class Activity extends NodeBox {
         '</comments><x-coord>', this.x,
         '</x-coord><y-coord>', this.y,
         '</y-coord><incoming-expressions>'];
-    for(let c in this.connections) if('CRPIT'.indexOf(c)) {
-      if(this.incoming_expressions[c]) {
-        xml.push('<incoming-x connection="', c, '">',
-            xmlEncoded(this.incoming_expressions[c].text),
-            '</incoming-x>');
-      }
+    for(let c in this.connections) if('CRPIT'.indexOf(c) >= 0) {
+      xml.push('<incoming-x connection="', c, '">',
+          xmlEncoded(this.incoming_expressions[c].text),
+          '</incoming-x>');
     }
     xml.push('</incoming-expressions><sub-activities>');
     for(let i = 0; i < this.sub_activities.length; i++) {
@@ -2084,7 +2097,7 @@ class Activity extends NodeBox {
           const
               con = nodeParameterValue(c, 'connection'),
               txt = xmlDecoded(nodeContent(c));
-          this.incoming_expressions[con] = new Expression(this, txt);
+          this.incoming_expressions[con].text = txt;
         }
       }
     }
@@ -2170,12 +2183,22 @@ class Activity extends NodeBox {
   stateChanged(t) {
     // Return TRUE if any of the aspects has changed compared to tick t-1.
     let change = false;
-    for (let k in this.state) if('CORPIT'.indexOf(k) > 0) {
+    for(let i = 0; i < 6; i++) {
       const
+          // NOTE: Start with aspect O for efficiency.
+          k = 'ORPITC'.charAt(i), 
           ps = (t <= 0 ? null : this.state[k][t - 1]),
           cs = this.state[k][t];
       if(cs !== ps) {
         change = true;
+        // Set or clear "active since" tick. 
+        if(k === 'O') {
+          if(cs && cs <= VM.EXCEPTION) {
+            this.active_since = t;
+          } else {
+            this.active_since = -1;
+          }
+        }
         break;
       }
     }
@@ -2184,14 +2207,18 @@ class Activity extends NodeBox {
 
   activated(t) {
     // Return TRUE iff O aspect is TRUE for tick t but not for tick t-1.
-    return (MODEL.solved && this.state.O[t] <= VM.EXCEPTION &&
-        (t === 0 || !this.state.O[t - 1]));
+    return (MODEL.solved && this.state.O[t] === 1 &&
+        (t === 0 || this.state.O[t - 1] !== 1));
   }
   
   isActive(t) {
-    return (MODEL.solved && this.state.O[t] < VM.EXCEPTION &&
-        this.state.O[t] > VM.EXCEPTION && this.state.O[t] !== 0);
-   }
+    return (MODEL.solved && this.state.O[t] === 1);
+  }
+  
+  activeColor(t) {
+    if(this.active_since < 0) return UI.color.node_rim;
+    return `rgb(0, ${Math.max(64, 160 - t + this.active_since)}, 48)`;
+  }
   
   containsActivity(a) {
     // Return the subactivity of this activity that contains activity `a`,
@@ -2461,38 +2488,47 @@ class Activity extends NodeBox {
   updateState(t) {
     // Determine whether this activity is "active" in the current cycle
     // ("tick" t).
-    if(t > 0) console.log('HERE state', this.displayName, VM.sig4Dig(this.state.O[t - 1]), t);
     const
+        entry = this.isEntry,
         s = this.state,
         ix = this.incoming_expressions;
     // First calculate the expressions (if any) associated with the CRPIT
-    // of this activity.
+    // of this activity. When such expressions are defined, the default
+    // rules are not applied *unless* they result in an exceptional value.
     for(let k in ix) if(ix.hasOwnProperty(k)) {
       s[k][t] = ix[k].result(t);
     }
-    // If tick > 0, again consider all CRPIT to apply the default rules
-    // if their state is still "not computed" or "undefined".
-    if(t > 0) {
-      for(let k in s) if('CRPIT'.indexOf(k) >= 0) {
-console.log('HERE t k s[k,t]', t, k, s[k][t-1], 'for', this.displayName);
-        if(s[k][t - 1] > VM.EXCEPTION) {
-          // No incoming expression => check incoming link aspects. When
-          // multiple links are incoming for this aspect, they must *all*
-          // "satisfy" by having at least 1 TRUE associated aspect value. 
+    // Review all CRPIT, and apply the default rules if their state still
+    // is "not computed" or "undefined".
+    for(let k in s) if('CRPIT'.indexOf(k) >= 0) {
+      if(s[k][t] >= VM.EXCEPTION) {
+        // No incoming expression result => set aspect to 0 and then check
+        // incoming link aspects (only when t > 0).
+        // NOTE: Entry functions by default satisfy all aspects.
+        s[k][t] = (entry ? 1 : 0);
+        if(t > 0) {
+          // When multiple links are incoming for this function aspect, they must
+          // *all* "satisfy" by having at least one TRUE associated aspect value.
+          const n = this.connections[k].length;
           let allset = true;
-          for(let i = 0; i < this.connections[k].length; i++) {
+          for(let i = 0; i < n; i++) {
             const
                 l = this.connections[k][i],
                 fa = l.from_activity;
-  console.log('HERE link from', fa.displayName, 't', t, 'state[t]', fa.state.O[t - 1]);
             // When the FROM activity is active, calculate all aspects on
             // this link, and assume that one non-zero result (TRUE) suffices
             // to "satisfy" this incoming link.
-            if(fa.isActive(t - 1)) {
+            if(fa.state.O[t - 1] === 1) {
               let cset = 0;
               for(let j = 0; j < l.aspects.length; j++) {
                 // NOTE: Aspects are calculated for "tick" t, not t-1.
-                const r = l.aspects[j].expression.result(t);
+                const
+                    x = l.aspects[j].expression,
+                    // Aspects without associated expression are TRUE.
+                    r = (x.defined ? x.result(t) : 1);
+                // Aspects with expressions must evaluate to TRUE; when
+                // PENDING, this is interpreted as FALSE until the setpoint
+                // has been reached.
                 cset += (r > VM.ERROR && r < VM.EXCEPTION ? r : 0);
               }
               allset = allset && cset > 0;
@@ -2503,18 +2539,16 @@ console.log('HERE t k s[k,t]', t, k, s[k][t-1], 'for', this.displayName);
           }
           // The state for CRPT is TRUE if all links are "satisfied" even
           // when there are no incoming links. For I, there *must* be at
-          // least one incoming link unless this is an "entry" activity.
-          s[k][t] = (allset && (k !== 'I' || this.isEntry) ? 1 : 0);
-          console.log('HERE k s[k,t]', k, s[k][t]);
+          // least one incoming link or this must be an "entry" activity.
+          if(allset && (k !== 'I' || n > 0 || this.isEntry)) s[k][t] = 1;
         }
       }
     }
     // This activity is considered "active" when all CRPITs are satisfied.
     if(s.C[t] && s.R[t] && s.P[t] && s.I[t] && s.T[t]) {
       s.O[t] = 1;
-      console.log('HERE state is TRUE for', this.displayName);
     } else {
-      s.O[t] = VM.UNDEFINED;
+      s.O[t] = 0;
     }
     return this.stateChanged(t);
   }
@@ -2645,6 +2679,21 @@ class Link {
     return ca;
   }
 
+  activeColor(t) {
+    // Returns a shade of green if this is a "deep link" comprising one
+    // or more active links, or the default rim color.
+    let as = -1;
+    if(this.deep_links.length) {
+      for(let i = 0; i < this.deep_links.length; i++) {
+        as = Math.max(as, this.deep_links[i].from_activity.active_since);
+      }
+    } else {
+      as = this.from_activity.active_since;
+    }
+    if(as >= 0 && as < t) return `rgb(0, ${Math.max(64, 160 - t + as)}, 48)`;
+    return UI.color.rim;
+  }
+  
   get containsFeedback() {
     // Returns TRUE if this is a "deep link" comprising a feedback link.
     for(let i = 0; i < this.deep_links.length; i++) {

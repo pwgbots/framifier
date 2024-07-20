@@ -278,26 +278,22 @@ class Paper {
       // ... and state-dependent fill colors
       fg_fill: '#ffffff',
       bg_fill: '#e0e0f0',
-      // Font colors for entities
+      // Font colors for entities.
       actor_font: '#40a0e0', // medium blue
-      // Process with level > 0 has a dark blue rim and production level font
-      active: '#000080',
-      // Block arrows are filled in grayish blue
-      block_arrow: '#7080a0',
       active_rim: '#00b0ff',
       active_fill: '#80ffff',
       value_fill: '#d0f0ff',
-      // All notes have thin gray rim, similar to other model diagram elements,
-      // that turns red when a note is selected
+      // All notes have thin gray rim, similar to other model diagram
+      // elements, that turns red when a note is selected.
       note_rim: '#909090',  // medium gray
       note_font: '#2060a0', // medium dark gray-blue
       // Notes are semi-transparent yellow (will have opacity 0.5).
       note_fill: '#ffff80',
       note_band: '#ffd860',  
       // Computation errors in expressions are signalled by displaying
-      // the result in bright red, typically the general error symbol (X)
+      // the result in bright red, typically the general error symbol (X).
       VM_error: '#e80000',
-      // Background color of GUI dialogs
+      // Background color of GUI dialogs.
       dialog_background: '#f4f8ff'
     };
     // Standard SVG URL
@@ -968,10 +964,11 @@ class Paper {
     // Clear previous drawing.
     l.shape.clear();
     const
-        vn = l.visibleNodes,
         // Link is dashed when it has no assiciated aspects.
         sda = (l.aspects.length ? 'none' : UI.sda.dash),
-        activated = l.containsActivated(MODEL.t);
+        activated = l.containsActivated(MODEL.t),
+        active_color = l.activeColor(MODEL.t),
+        vn = l.visibleNodes;
     // Double-check: do not draw unless both activities are visible.
     if(!vn[0] || !vn[1]) {
       const cdl = this.comprisingDeepLink(l);
@@ -990,8 +987,13 @@ class Paper {
       ady = 4;
     } else {
       stroke_width = 1.25;
-      if(activated) {
-        stroke_color = '#60b060';
+      if(activated || active_color !== this.palette.rim) {
+        if(activated) {
+          stroke_color = '#60b060';
+        } else {
+          stroke_color = active_color;
+        }
+        // NOTE: Only one shade of green for the chevron tip.
         chev = this.green_chevron;
       } else if(l.is_feedback || l.containsFeedback) {
         stroke_color = 'black';
@@ -1087,12 +1089,10 @@ class Paper {
     if(ndl > 1) {
       // NOTE: Deep links representing multiple links cannot be selected,
       // so they are always depicted in gray.
-      // @@@ TO DO: Use color when active.
       stroke_width = 2.5;
       stroke_color = (activated ? '#60b060' : '#808090');
       chev = this.deep_chevron;
       opac = 0.75;
-      // @@@ set onmouseover and mouseout so that it displays its links.
     }
     const tl = l.shape.addPath(
         [`M${x1},${y1}C${fcx},${fcy},${tcx},${tcy},${x2},${y2}`],
@@ -1131,6 +1131,11 @@ class Paper {
                 {'font-size': 9, 'pointer-events': 'auto'}),
             nimbus = (a.comments && DOCUMENTATION_MANAGER.visible ?
                 ', 0 0 3.5px rgb(0,80,255)' : '');
+        // Use italic font when aspect is time-dependent.
+        if(a.expression.defined && !a.expression.isStatic) {
+          le.setAttribute('font-style', 'italic');
+        }
+        // Use bold-face red when aspect is selected by the modeler.
         if(a === MODEL.selected_aspect) {
           le.setAttribute('fill', UI.color.select);
           le.setAttribute('font-weight', 700);
@@ -1154,11 +1159,19 @@ class Paper {
         le.addEventListener('mouseout', cauc);
         // ... and make it show this by changing the cursor.
         le.setAttribute('cursor', 'pointer');
-        if(MODEL.solved && a.expression.defined) {
+        if(a.expression.defined && fa.isActive(MODEL.t - 1)) {
+          // When model has been solved, show value of aspect if the
+          // FROM activity was active in the previous cycle.
           const
-              r = a.expression.result(MODEL.t),
+              x = a.expression,
+              r = x.result(MODEL.t),
+              // For "pending" expressions, show their AFTER setpoint.
+              ap = (r === VM.PENDING || x.time_after !== false ?
+                  a.expression.after_points[MODEL.t] : false),
+              extra = (ap === false ? '' : '\u29D6' + UI.clockTime(ap)),
               s = VM.sig4Dig(r),
-              nbb = this.numberSize(s, 9),
+              nbb = this.numberSize(s + extra, 9),
+              nobb = this.numberSize(s, 9),
               bw = nbb.width + 4,
               bh = nbb.height + 2,
               bx = bp[0] + (a.width + bw) / 2,
@@ -1166,11 +1179,13 @@ class Paper {
           l.shape.addRect(bx, by, bw, bh,
               {stroke: '#80a0ff', 'stroke-width': 0.5, fill: '#d0f0ff'});
           if(r <= VM.ERROR || r >= VM.EXCEPTION) {
-            l.shape.addNumber(bx, by, s,
+            l.shape.addNumber(bx, by, s + extra,
                 {'font-size': 9, 'fill': this.palette.VM_error});
           } else {
-            l.shape.addNumber(bx, by, s,
+            l.shape.addNumber(bx - bw / 2 + 2 + nobb.width / 2, by, s,
                 {'font-size': 9, 'fill': '#0000a0', 'font-weight': 700});
+            l.shape.addText(bx + nobb.width, by, extra,
+                {'font-size': 9, 'fill': '#f07000'});
           }
         }
         p += 2 * step;
@@ -1195,15 +1210,16 @@ class Paper {
         y = act.y + dy,
         hw = act.width / 2,
         hh = act.height / 2,
-        qw = hw / 2;
+        qw = hw / 2,
+        active = act.isActive(MODEL.t);
     let stroke_width = 1,
         stroke_color = this.palette.rim,
         fill_color = (background ? this.palette.bg_fill :
             this.palette.fg_fill);
     // Active states have a dark green rim.
-    if(MODEL.solved && act.isActive(MODEL.t)) {
+    if(active) {
       stroke_width = 1.5;
-      stroke_color = `rgb(0, ${Math.max(64, 160 - MODEL.t)}, 48)`;
+      stroke_color = act.activeColor(MODEL.t);
     }
     // Being selected overrules special border properties except SDA
     if(act.selected) {

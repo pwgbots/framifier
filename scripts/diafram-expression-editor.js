@@ -210,12 +210,6 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
         this.warningEntityExists(nasp);
         return false;
       }
-      // Rename was successful => diagram must be updated.
-      let l = MODEL.linksWithAspect(obj);
-      for(let i = 0; i < l.length; i++) {
-        // Redraw the shape, as its appearance may have changed.
-        UI.paper.drawLink(l[i]);
-      }
     }
     // Only now parse the contents of the expression editor.
     let xt = this.text.value.trim();
@@ -226,6 +220,7 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
     this.text.value = xt;
     const xp = new ExpressionParser(xt, this.edited_object,
         this.edited_connector);
+    let ok;
     if(xp.error) {
       this.status.innerHTML = xp.error;
       this.status.style.backgroundColor = 'Yellow';
@@ -233,13 +228,26 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
       this.text.focus();
       this.text.selectionStart = xp.pit - xp.los;
       this.text.selectionEnd = xp.pit;
-      return false;
+      ok = false;
     } else {
+      // Changing an expression invalidates model results.
+      const reset = this.edited_expression.text !== xp.expr;
       this.edited_expression.text = xp.expr;
+      if(reset) UI.resetModel();
       UI.modals.expression.hide();
       UI.edited_object = false;
-      return true;
+      ok = true;
     }
+    if(obj instanceof Aspect) {
+      // For aspect expressions, the diagram must be updated because
+      // aspects may be renamed, and the expression may have changed
+      // from static to dynamic or vice versa.
+      let l = MODEL.linksWithAspect(obj);
+      for(let i = 0; i < l.length; i++) {
+        UI.paper.drawLink(l[i]);
+      }
+    }
+    return ok;
   }
   
   clearStatusBar() {
