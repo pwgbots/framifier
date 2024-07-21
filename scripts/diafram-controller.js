@@ -1320,12 +1320,23 @@ class GUIController {
     con.onmouseover = connectorMouseOver;
     con.onmouseout = connectorMouseOut;
     con.onmousedown = connectorMouseDown;
-    con.addEventListener('click', (event) => {
-        UI.editIncomingExpression(event);
-      });
-    con.addEventListener('mouseover', () => {
-        
-      });
+    if(asp !== 'O') {
+      con.addEventListener('click', (event) => {
+          UI.editIncomingExpression(event);
+        });
+      con.addEventListener('mouseover', () => {
+          UI.deep_link_info =
+              `${circledLetter(asp)} <em>of function</em> ` +
+                  act.displayName;
+          if(MODEL.solved) {
+            UI.deep_link_info += ' = <span style="color: blue">' +
+              VM.sig4Dig(act.state[asp][MODEL.t]) + '</span>';
+          }
+          const ix = act.incoming_expressions[asp];
+          if(ix.defined) UI.deep_link_info +=
+              `<code style="color: gray"> &#x225C; ${ix.text}</code>`;
+        });
+    }
     function connectorMouseOver() {
       // Do not respond when connecting from the same activity, or when
       // trying to connect to an output.
@@ -1895,7 +1906,7 @@ class GUIController {
       if(this.on_link) {
         this.showAddAspectDialog(this.on_link);
       } else if(this.on_aspect) {
-        this.showAspectPropertiesDialog(this.on_aspect);
+        this.showAspectPropertiesDialog(this.on_aspect, this.on_aspect_link);
       } else if(this.on_activity) {
         this.showActivityPropertiesDialog(this.on_activity);
       } else if(this.on_note) {
@@ -2286,22 +2297,6 @@ class GUIController {
     return n;
   }
 
-  updateExpressionInput(id, name, x) {
-    // Updates expression object `x` if input field identified by `id`
-    // contains a well-formed expression. If error, focuses on the field
-    // and shows the error while specifying the name of the field.
-    const
-        inp = document.getElementById(id),
-        xp = new ExpressionParser(inp.value.trim(), x.object);
-    if(xp.error) {
-      inp.focus();
-      this.warn(`Invalid expression for ${name}: ${xp.error}`);
-      return false;
-    }
-    x.update(xp);
-    return true;
-  }
-  
   //
   // Navigation in the activity hierarchy.
   //
@@ -3276,10 +3271,11 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     md.hide();
   }
 
-  showAspectPropertiesDialog(a) {
+  showAspectPropertiesDialog(a, l) {
     // NOTE: The aspect properties modal is the Expression Editor.
     this.edited_object = a;
-    X_EDIT.editExpression(a);
+    const c = (l ? l.to_connector : '');
+    X_EDIT.editExpression(a, c);
   }
   
 } // END of class GUIController

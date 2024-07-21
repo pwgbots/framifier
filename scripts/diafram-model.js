@@ -1836,9 +1836,25 @@ class Aspect extends NodeBox {
 
   get infoLineName() {
     let extra = '';
-    if(this.activity) {
-       extra = '<span class="extra">(scope: '+ this.activity.displayName +
+    if(this.parent) {
+       extra = '<span class="extra">(scope: '+ this.parent.displayName +
             ')</span>';
+    }
+    const x = this.expression;
+    if(x.defined) {
+      if(MODEL.solved) {
+        const
+           r = x.result(MODEL.t),
+           rs = VM.sig4Dig(r),
+           rp = r === VM.PENDING,
+           xrt = (rp ? x.after_points[MODEL.t] :
+              (x.time_until ? x.until_points[MODEL.t] : false)),
+           sym = (rp ? '' : ' \u25D4'),
+           xrs = (xrt === false ? '' :
+              `<span style="color: #f07000">${sym}${UI.clockTime(xrt)}</span>`);
+        extra += ` = <span style="color: blue">${rs}${xrs}</span>`;
+      }
+      extra += `<code style="color: gray"> &#x225C; ${x.text}</code>`;
     }
     return `<em>System aspect:</em> ${this.displayName}${extra}`;
   }
@@ -1872,6 +1888,17 @@ class Aspect extends NodeBox {
     this.resize();
     this.comments = xmlDecoded(nodeContentByTag(node, 'comments'));
     this.expression.text = xmlDecoded(nodeContentByTag(node, 'expression'));
+  }
+  
+  get isTimeAspect() {
+    // Return TRUE if this aspect occurs only on links that relate to Time.
+    const ol = this.parent.connections.O;
+    for(let i = 0; i < ol.length; i++) {
+      if(ol[i].to_connector !== 'T' && ol[i].aspects.indexOf(this) >= 0) {
+        return false;
+      }
+    }
+    return true;
   }
   
   removeFromLink(l) {
@@ -2216,7 +2243,8 @@ class Activity extends NodeBox {
   }
   
   activeColor(t) {
-    if(this.active_since < 0) return UI.color.node_rim;
+    if(this.activated(t)) return UI.color.active_rim;
+    if(this.active_since < 0) return UI.color.rim;
     return `rgb(0, ${Math.max(64, 160 - t + this.active_since)}, 48)`;
   }
   
@@ -2498,6 +2526,7 @@ class Activity extends NodeBox {
     for(let k in ix) if(ix.hasOwnProperty(k)) {
       s[k][t] = ix[k].result(t);
     }
+console.log('HERE time state for', this.displayName, VM.sig4Dig(s.T[t]));
     // Review all CRPIT, and apply the default rules if their state still
     // is "not computed" or "undefined".
     for(let k in s) if('CRPIT'.indexOf(k) >= 0) {

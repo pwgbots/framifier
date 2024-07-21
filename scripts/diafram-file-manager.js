@@ -92,7 +92,7 @@ class GUIFileManager {
   }
   
   pushModelToBrowser(xml) {
-    // Save model as .dia file.
+    // Save model as .dfram file.
     UI.setMessage('Model file size: ' + UI.sizeInBytes(xml.length));
     const el = document.getElementById('xml-saver');
     el.href = 'data:attachment/text,' + encodeURI(xml);

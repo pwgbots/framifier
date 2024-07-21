@@ -280,7 +280,7 @@ class Paper {
       bg_fill: '#e0e0f0',
       // Font colors for entities.
       actor_font: '#40a0e0', // medium blue
-      active_rim: '#00b0ff',
+      active_rim: '#40b040', // middle green
       active_fill: '#80ffff',
       value_fill: '#d0f0ff',
       // All notes have thin gray rim, similar to other model diagram
@@ -382,7 +382,7 @@ class Paper {
     this.addMarker(defs, id, chev, 8, 'rgb(0, 0, 0)');
     id = 'g_r_e_e_n__c_h_e_v_r_o_n__t_i_p__ID*';
     this.green_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 8, 'rgb(64, 176, 64)');
+    this.addMarker(defs, id, chev, 8, this.palette.active_rim);
     id = 'd_e_e_p__c_h_e_v_r_o_n__t_i_p__ID*';
     this.deep_chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 10, 'rgb(128, 128, 144)');
@@ -1165,10 +1165,12 @@ class Paper {
           const
               x = a.expression,
               r = x.result(MODEL.t),
-              // For "pending" expressions, show their AFTER setpoint.
-              ap = (r === VM.PENDING || x.time_after !== false ?
-                  a.expression.after_points[MODEL.t] : false),
-              extra = (ap === false ? '' : '\u29D6' + UI.clockTime(ap)),
+              rp = r === VM.PENDING,
+              // When AFTER or UNTIL are in play, show their setpoint.
+              ap = (rp ? x.after_points[MODEL.t] :
+                  (x.time_until ? x.until_points[MODEL.t] : false)),
+              extra = (ap === false ? '' : (rp ? '' : '\u25D4') +
+                  UI.clockTime(ap)),
               s = VM.sig4Dig(r),
               nbb = this.numberSize(s + extra, 9),
               nobb = this.numberSize(s, 9),
@@ -1233,7 +1235,7 @@ class Paper {
             'stroke-width': stroke_width});
     if(background) {
       act.shape.addPath(['M', x, ',', y, 'l', qw, ',',
-          (act.isExit ? '-' : ''), hh, 'l-', hw, ',0Z'],
+          (act.isExit ? '-' : ''), hh - 0.5, 'l-', hw, ',0Z'],
           {fill: 'white', opacity: 0.6});
     }
     // Draw inner shadow if activity has sub_activities.

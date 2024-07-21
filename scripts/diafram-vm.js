@@ -32,7 +32,8 @@ SOFTWARE.
 // CLASS Expression
 class Expression {
   constructor(obj, text) {
-    // Expressions are defined for system aspects.
+    // Expressions are defined for system aspects and for "incoming"
+    // CRPITs of activities.
     this.object = obj;
     this.text = text;
      // A stack for local time step (to allow lazy evaluation).
@@ -54,6 +55,8 @@ class Expression {
     // Simulation clock time set points.
     this.time_after = false;
     this.after_points = [];
+    this.time_until = false;
+    this.until_points = [];
   }
   
   get variableName() {
@@ -77,13 +80,14 @@ class Expression {
 
   reset(default_value=VM.NOT_COMPUTED) {
     // Clear result of previous computation (if any).
-    this.method_object = null;
     this.compile_issue = '';
     this.compute_issue = '';
     this.step.length = 0;
     this.stack.length = 0;
     this.time_after = false;
     this.after_points.length = 0;
+    this.time_until = false;
+    this.until_points.length = 0;
     // Always compile so ast to ensure correct isStatic.
     this.compile(); 
     // Static expressions only need a vector with one element (having index 0).
@@ -194,9 +198,8 @@ class Expression {
           ':', this.text, '@', t, v[t]);
       return true;
     }
-    // Clear the AFTER setpoint if simulated time has passed beyond this
+    // Clear the event setpoints if simulated time has passed beyond this
     // setpoint.
-    let on_the_dot = MODEL.clock_time[t] === this.time_after;
     if(this.time_after !== false) {
       if(MODEL.clock_time[t] >= this.time_after) this.time_after = false;
     }
@@ -235,10 +238,8 @@ class Expression {
     }
     // Now check the AFTER setpoint, as it may have been set by this
     // expression, and then the result should be "PENDING".
-    if(on_the_dot) {
-      console.log('HERE on the dot');
-    } else if(this.time_after !== false) {
-      console.log('HERE ta v aspts', MODEL.clock_time[t], this.time_after, v[t], VM.after_setpoints);
+    if(this.time_after !== false) {
+      console.log('HERE ta v aspts', MODEL.clock_time[t], this.time_after, v[t], VM.event_setpoints);
       v[t] = VM.PENDING;
     }
     this.trace('RESULT = ' + VM.sig4Dig(v[t]));
@@ -422,14 +423,24 @@ class ExpressionParser {
   constructor(text, owner=null, connector='') {
     // Setting TRACE to TRUE will log parsing information to the console.
     this.TRACE = false;
-    // `owner` is the aspect for which the expression is parsed.
+    // `owner` is the aspect for which the expression is parsed, or the
+    // activity for which an incoming expression is parsed.
     this.owner = owner;
     // `connector` is the aspect letter (CRPIT) in case an incoming
     // expression is parsed.
     this.connector = connector;
     // `text` is the expression string to be parsed.
     this.expr = text;
-    this.expansions = [];
+    // Record whether this is a Time aspect expression.
+    // For activity expressions, verify that the parsed text is identical
+    // to the text of the incoming expression for Time for the owner.
+    // NOTE: This introduces the risk that modelers use the same text
+    // for other aspects as well, but then this should not introduce
+    // different behavior.
+    this.time_aspect_expression =
+        (owner instanceof Aspect && owner.isTimeAspect) ||
+        (owner instanceof Activity && (connector === 'T' ||
+             owner.incoming_expressions.T.text === text));
     // Immediately compile; this may generate warnings.
     this.compile();
   }
@@ -440,7 +451,7 @@ class ExpressionParser {
     let n = this.owner.displayName;
     return n;
   }
-
+  
   log(msg) {
     // NOTE: This method is used only to profile dynamic expressions.
     if(true) return;
@@ -757,8 +768,12 @@ class ExpressionParser {
             this.error = `Invalid symbol "${v}"`;
           } else {
             this.sym = SYMBOL_CODES[i];
-            // NOTE: Using time symbols or `random` makes the expression dynamic! 
+            // Using time symbols or `random` makes the expression dynamic. 
             if(DYNAMIC_SYMBOLS.indexOf(l) >= 0) this.is_static = false;
+            // Time symbols may only be used in Time aspect expressions.
+            if(TIME_ASPECT_CODES.indexOf(this.sym) >= 0 &&
+               !this.time_aspect_expression) this.error =
+                   'Symbol can be used only in Time aspect expressions';
           }
         }
       }
@@ -766,8 +781,8 @@ class ExpressionParser {
     }
     // A minus is monadic if at the start of the expression, or NOT preceded
     // by a "constant symbol", a number, or a closing parenthesis `)`.
-    // Constant symbols are time 't', block start 'b', block length 'n',
-    // look-ahead 'l', 'random', 'true', 'false', 'pi', and 'infinity'
+    // Constant symbols are cycle number 'c', clock time 'now', 'random',
+    // 'true', 'false', 'pi', and 'infinity'
     if(DYADIC_CODES.indexOf(this.sym) === DYADIC_OPERATORS.indexOf('-') &&
         (this.prev_sym === null ||
             !(Array.isArray(this.prev_sym) ||
@@ -779,8 +794,8 @@ class ExpressionParser {
   }
 
   codeOperation(op) {
-    // Adds operation (which is an array [function, [arguments]]) to the
-    // code, and "pops" the operand stack only if the operator is dyadic
+    // Add operation (which is an array [function, [arguments]]) to the
+    // code, and "pop" the operand stack only if the operator is dyadic.
     if(op === VMI_if_then) {
       if(this.if_stack.length < 1) {
         this.error = 'Unexpected ?';
@@ -995,7 +1010,7 @@ class VirtualMachine {
     
     this.call_stack = [];
     this.issue_list = [];
-    this.after_setpoints = [];
+    this.event_setpoints = [];
 
     // Floating-point constants used in calculations.
 
@@ -1107,9 +1122,9 @@ class VirtualMachine {
     this.issue_index = -1;
     UI.updateIssuePanel();
     this.messages.length = 0;
-    // Clear AFTER setpoint list.
-    this.after_setpoints.length = 0;
-    // Reset the (graphical) controller.
+    // Clear setpoint lists.
+    this.event_setpoints.length = 0;
+    // Reset the VM monitor.
     MONITOR.reset();
     this.t = 0;
     // Prepare for halt.
@@ -1322,13 +1337,13 @@ class VirtualMachine {
     this.t = 0;
     // Then iterate throught the simulation period.
     while(this.t <= MODEL.run_length) {
-console.log('HERE t setpoints', this.t, this.after_setpoints.toString());
+console.log('HERE t setpoints', this.t, this.event_setpoints.toString());
       if(this.t > 0) {
-        if(this.after_setpoints.length) {
+        if(this.event_setpoints.length) {
           // Advance to the next relevant point in time, and remove it
-          // from the list of AFTER setpoints.
-          this.after_setpoints.sort();
-          MODEL.clock_time[this.t] = this.after_setpoints.shift();
+          // from the list of event setpoints.
+          this.event_setpoints.sort();
+          MODEL.clock_time[this.t] = this.event_setpoints.shift();
         } else {
           // Time does not advance.
           MODEL.clock_time[this.t] = MODEL.clock_time[this.t - 1];
@@ -1450,6 +1465,28 @@ function VMI_push_clock_time(x) {
   x.push(ct);
 }
 
+function VMI_push_last_activation(x) {
+  // Push the clock time (in hours) of the cycle in which the parent
+  // activity of the owning aspect of expression `x` was last activated,
+  // or 0 when this owner is not an aspect.
+  const act = (x.object instanceof Aspect ? x.object.parent : x.object);
+  let t = x.step[x.step.length - 1];
+  if(true||DEBUGGING) {
+    console.log(`push last activation of ${act.displayName} (t = ${t})`);
+  }
+  let lat = 0;
+  if(act) {
+    // Find the most recent "tick" for which the activity was active.
+    while(t >= 0 && !act.state.O[t]) t--;
+    // Trace back to the "tick" for which the activity was activated.
+    while(t > 0 && act.state.O[t - 1]) t--;
+    // Get the clock time for this tick.
+    lat = MODEL.clock_time[t];
+  }
+  x.push(lat);
+  if(true||DEBUGGING) console.log(`last activation = ${UI.clockTime(lat)}`);
+}
+
 function VMI_push_random(x) {
   // Push a random number from the interval [0, 1).
   const r = Math.random();
@@ -1485,10 +1522,40 @@ function VMI_after(x) {
       x.time_after = d;
       x.after_points[t] = d;
       // NOTE: Points in time are stored as floating point numbers.
-      addDistinct(d, VM.after_setpoints); 
-console.log('HERE setpoint added', VM.after_setpoints);
+      addDistinct(d, VM.event_setpoints); 
+console.log('HERE setpoint added', VM.event_setpoints);
     }
 console.log('HERE x.after_points', x.object.displayName, x.after_points);
+  }
+}
+
+function VMI_until(x) {
+  // Pop the stack top value T. If T > NOW and the UNTIL setpoint of
+  // expression `x` equals FALSE, set this UNTIL setpoint to T, and
+  // return TRUE. If T <= NOW, clear the UNTIL setpoint, and return FALSE.
+  // The Virtual Machine keeps track of setpoints and will advance the
+  // simulated time clock after completing cycle to the earliest setpoint.
+  const
+      t = x.step[x.step.length - 1],
+      ct = MODEL.clock_time[t],
+      d = x.top();
+  if(true||DEBUGGING) {
+    console.log(`UNTIL ${d} (clock time: ${ct}, setpoint: ${x.time_until})`);
+  }
+  if(d !== false) {
+    if(d <= ct) {
+      x.retop(0);
+      x.time_until = false;
+      x.until_points[t] = false;
+    } else {
+      x.retop(1);
+      x.time_until = d;
+      x.until_points[t] = d;
+      // NOTE: Points in time are stored as floating point numbers.
+      addDistinct(d, VM.event_setpoints); 
+console.log('HERE setpoint added', VM.event_setpoints);
+    }
+console.log('HERE x.until_points', x.object.displayName, x.until_points);
   }
 }
 
@@ -2405,25 +2472,28 @@ const
   SEPARATOR_CHARS = PARENTHESES + OPERATOR_CHARS + "[ '",
   COMPOUND_OPERATORS = ['!=', '<>', '>=', '<='],
   CONSTANT_SYMBOLS = [
-      'c', 'now', 'random', 'true', 'false', 'pi', 'infinity', '#',
-      'yr', 'wk', 'd', 'h', 'm', 's'],
+      'c', 'now', 'last',
+      'random', 'true', 'false',
+      'pi', 'infinity', '#',
+      'yr', 'wk', 'd', 'h',
+      'm', 's'],
   CONSTANT_CODES = [
-      VMI_push_time_step, VMI_push_clock_time,
+      VMI_push_time_step, VMI_push_clock_time, VMI_push_last_activation,
       VMI_push_random, VMI_push_true, VMI_push_false,
       VMI_push_pi, VMI_push_infinity, VMI_push_contextual_number,
       VMI_push_year, VMI_push_week, VMI_push_day, VMI_push_hour,
       VMI_push_minute, VMI_push_second],
-  DYNAMIC_SYMBOLS = ['c', 'now', 'random', 'after'],
+  DYNAMIC_SYMBOLS = ['c', 'now', 'last', 'random', 'after', 'until'],
   MONADIC_OPERATORS = [
       '~', 'not', 'abs', 'sin', 'cos', 'atan', 'ln',
       'exp', 'sqrt', 'round', 'int', 'fract', 'min', 'max',
       'binomial', 'exponential', 'normal', 'poisson', 'triangular',
-      'weibull', 'after'],
+      'weibull', 'after', 'until'],
   MONADIC_CODES = [
       VMI_negate, VMI_not, VMI_abs, VMI_sin, VMI_cos, VMI_atan, VMI_ln,
       VMI_exp, VMI_sqrt, VMI_round, VMI_int, VMI_fract, VMI_min, VMI_max,
       VMI_binomial, VMI_exponential, VMI_normal, VMI_poisson, VMI_triangular,
-      VMI_weibull, VMI_after],
+      VMI_weibull, VMI_after, VMI_until],
   DYADIC_OPERATORS = [
       ';', '?', ':', 'or', 'and',
       '=', '<>', '!=',
@@ -2434,8 +2504,14 @@ const
       VMI_eq, VMI_ne, VMI_ne, VMI_gt, VMI_lt, VMI_ge, VMI_le,
       VMI_add, VMI_sub, VMI_mul, VMI_div, VMI_mod,
       VMI_power, VMI_log, VMI_replace_undefined],
+  
+  // Compiler checks for time aspect codes as they can be used only in
+  // Time aspect expressions.
+  TIME_ASPECT_CODES = [VMI_after, VMI_push_clock_time, VMI_push_year,
+      VMI_push_week, VMI_push_day, VMI_push_hour, VMI_push_minute,
+      VMI_push_second, VMI_until],
 
-  // Compiler checks for random codes as they make an expression dynamic
+  // Compiler checks for random codes as they make an expression dynamic.
   RANDOM_CODES = [VMI_binomial, VMI_exponential, VMI_normal, VMI_poisson,
       VMI_triangular, VMI_weibull],
   
@@ -2446,7 +2522,7 @@ const
   OPERATORS = DYADIC_OPERATORS.concat(MONADIC_OPERATORS), 
   OPERATOR_CODES = DYADIC_CODES.concat(MONADIC_CODES),
   PRIORITIES = [1, 2, 2, 3, 4, 5, 5, 5, 5, 5, 5, 5, 6, 6, 7, 7, 7, 8, 8, 10,
-      9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+      9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
   ACTUAL_SYMBOLS = CONSTANT_SYMBOLS.concat(OPERATORS),
   SYMBOL_CODES = CONSTANT_CODES.concat(OPERATOR_CODES);
 
