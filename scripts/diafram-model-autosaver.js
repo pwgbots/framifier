@@ -38,13 +38,13 @@ class ModelAutoSaver {
   constructor() {
     // Keep track of time-out interval of auto-saving feature
     this.timeout_id = 0;
-    this.time_prefix = '_A_S_T_$';
+    this.time_prefix = '_D_F_R_A_M__A_S_T_$';
     this.interval = 10; // auto-save every 10 minutes
     this.period = 24; // delete models older than 24 hours
     // Overwite defaults if settings still in local storage of browser
     this.purgeSavedModels();
     this.setInterval();
-    // Add listeners to GUI elements
+    // Add listeners to GUI elements.
     this.confirm_dialog = document.getElementById('confirm-remove-models');
     document.getElementById('auto-save-clear-btn').addEventListener('click',
         () => AUTO_SAVE.confirm_dialog.style.display = 'block');

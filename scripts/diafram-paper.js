@@ -280,8 +280,10 @@ class Paper {
       bg_fill: '#e0e0f0',
       // Font colors for entities.
       actor_font: '#40a0e0', // medium blue
-      active_rim: '#40b040', // middle green
-      active_fill: '#80ffff',
+      connecting: '#00b0ff', // bright blue
+      connecting_fill: '#80ffff', // light cyan
+      active: '#40b040', // middle green
+      activated: '#60b060', // brighter green
       value_fill: '#d0f0ff',
       // All notes have thin gray rim, similar to other model diagram
       // elements, that turns red when a note is selected.
@@ -319,56 +321,16 @@ class Paper {
     // Add marker definitions
     const
         defs = this.newSVGElement('defs'),
-        // Standard arrow tips: solid triangle
-        tri = 'M0,0 L10,5 L0,10 z',
         // Wedge arrow tips have no baseline
         wedge = 'M0,0 L10,5 L0,10 L0,8.5 L8.5,5 L0,1.5 z',
         // link arrows have a flat, "chevron-style" tip
-        chev = 'M0,0 L10,5 L0,10 L4,5 z',
-        // Feedback arrows are hollow and have hole in their baseline
-        fbt = 'M0,3L0,0L10,5L0,10L0,7L1.5,7L1.5,8.5L8.5,5L1.5,1.5L1.5,3z';
+        chev = 'M0,0 L10,5 L0,10 L4,5 z';
 
     // NOTE: standard SVG elements are defined as properties of this paper
     this.size_box = '__c_o_m_p_u_t_e__b_b_o_x__ID*';
     this.drag_line = '__d_r_a_g__l_i_n_e__ID*';
     this.drag_rect = '__d_r_a_g__r_e_c_t__ID*';
-    let id = 't_r_i_a_n_g_l_e__t_i_p__ID*';
-    this.triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 8, this.palette.rim);
-    id = 'a_c_t_i_v_e__t_r_i_a_n_g_l_e__t_i_p__ID*';
-    this.active_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 8, this.palette.active_process);
-    id = 'a_c_t_i_v_e__r_e_v__t_r_i__t_i_p__ID*';
-    this.active_reversed_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 8, this.palette.compound_flow);
-    id = 'i_n_a_c_t_i_v_e__t_r_i_a_n_g_l_e__t_i_p__ID';
-    this.inactive_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 8, 'silver');
-    id = 'o_p_e_n__t_r_i_a_n_g_l_e__t_i_p__ID*';
-    this.open_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 7.5, 'white');
-    id = 's_e_l_e_c_t_e_d__t_r_i_a_n_g_l_e__t_i_p__ID*';
-    this.selected_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 7.5, this.palette.select);
-    id = 'w_h_i_t_e__t_r_i_a_n_g_l_e__t_i_p__ID*';
-    this.white_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 9.5, 'white');
-    id = 'c_o_n_g_e_s_t_e_d__t_r_i_a_n_g_l_e__t_i_p__ID*';
-    this.congested_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 7.5, this.palette.at_process_ub_arrow);
-    id = 'd_o_u_b_l_e__t_r_i_a_n_g_l_e__t_i_p__ID*';
-    this.double_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 12, this.palette.rim);
-    id = 'a_c_t_i_v_e__d_b_l__t_r_i__t_i_p__ID*';
-    this.active_double_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 12, this.palette.active_process);
-    id = 'i_n_a_c_t_i_v_e__d_b_l__t_r_i__t_i_p__ID*';
-    this.inactive_double_triangle = `url(#${id})`;
-    this.addMarker(defs, id, tri, 12, 'silver');
-    id = 'f_e_e_d_b_a_c_k__t_r_i_a_n_g_l_e__t_i_p__ID*';
-    this.feedback_triangle = `url(#${id})`;
-    this.addMarker(defs, id, fbt, 10, this.palette.rim);
-    id = 'c_h_e_v_r_o_n__t_i_p__ID*';
+    let id = 'c_h_e_v_r_o_n__t_i_p__ID*';
     this.chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 8, this.palette.rim);
     id = 's_e_l_e_c_t_e_d__c_h_e_v_r_o_n__t_i_p__ID*';
@@ -376,25 +338,16 @@ class Paper {
     this.addMarker(defs, id, chev, 10, this.palette.select);
     id = 'c_o_n_n_e_c_t_i_n_g__c_h_e_v_r_o_n__t_i_p__ID*';
     this.connecting_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 10, this.palette.active_rim);
+    this.addMarker(defs, id, chev, 10, this.palette.connecting);
     id = 'f_e_e_d_b_a_c_k__c_h_e_v_r_o_n__t_i_p__ID*';
     this.feedback_chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 8, 'rgb(0, 0, 0)');
     id = 'g_r_e_e_n__c_h_e_v_r_o_n__t_i_p__ID*';
     this.green_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 8, this.palette.active_rim);
+    this.addMarker(defs, id, chev, 8, this.palette.active);
     id = 'd_e_e_p__c_h_e_v_r_o_n__t_i_p__ID*';
     this.deep_chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 10, 'rgb(128, 128, 144)');
-    id = 'o_p_e_n__w_e_d_g_e__t_i_p__ID*';
-    this.open_wedge = `url(#${id})`;
-    this.addMarker(defs, id, wedge, 9, this.palette.rim);
-    id = 's_e_l_e_c_t_e_d__o_p_e_n__w_e_d_g_e__t_i_p__ID*';
-    this.selected_open_wedge = `url(#${id})`;
-    this.addMarker(defs, id, wedge, 11, this.palette.select);
-    id = 'r__b__g_r_a_d_i_e_n_t__ID*';
-    this.red_blue_gradient = `url(#${id})`;
-    this.addGradient(defs, id, 'rgb(255,176,176)', 'rgb(176,176,255)');
     id = 't_e_x_t__s_h_a_d_o_w__ID*';
     this.text_shadow_filter = `filter: url(#${id})`;
     this.addShadowFilter(defs, id, 'rgb(255,255,255)', 2);
@@ -742,7 +695,7 @@ class Paper {
       el.id = this.drag_line;
       el.style.opacity = 0;
       el.style.fill = 'none';
-      el.style.stroke = UI.color.active_rim;
+      el.style.stroke = UI.color.connecting;
       el.style.strokeWidth = 1.5;
       el.style.strokeDasharray = UI.sda.dash;
       el.style.strokeLinecap = 'round';
@@ -989,7 +942,7 @@ class Paper {
       stroke_width = 1.25;
       if(activated || active_color !== this.palette.rim) {
         if(activated) {
-          stroke_color = '#60b060';
+          stroke_color = this.palette.activated;
         } else {
           stroke_color = active_color;
         }
@@ -1090,7 +1043,7 @@ class Paper {
       // NOTE: Deep links representing multiple links cannot be selected,
       // so they are always depicted in gray.
       stroke_width = 2.5;
-      stroke_color = (activated ? '#60b060' : '#808090');
+      stroke_color = (activated ? UI.color.active : UI.color.rim);
       chev = this.deep_chevron;
       opac = 0.75;
     }
@@ -1159,18 +1112,19 @@ class Paper {
         le.addEventListener('mouseout', cauc);
         // ... and make it show this by changing the cursor.
         le.setAttribute('cursor', 'pointer');
-        if(a.expression.defined && fa.isActive(MODEL.t - 1)) {
+        if(a.expression.defined &&
+            (fa.isActive(MODEL.t - 1) || a.isLasting(MODEL.t))) {
           // When model has been solved, show value of aspect if the
-          // FROM activity was active in the previous cycle.
+          // FROM activity was active in the previous cycle, or its
+          // output aspect is lasting due to some UNTIL.
           const
               x = a.expression,
               r = x.result(MODEL.t),
               rp = r === VM.PENDING,
               // When AFTER or UNTIL are in play, show their setpoint.
-              ap = (rp ? x.after_points[MODEL.t] :
-                  (x.time_until ? x.until_points[MODEL.t] : false)),
-              extra = (ap === false ? '' : (rp ? '' : '\u25D4') +
-                  UI.clockTime(ap)),
+              aup = (rp ? x.after_points[MODEL.t] : x.until_points[MODEL.t]),
+              extra = (!aup && aup !== 0 ? '' : (rp ? '' : '\u25D4') +
+                  UI.clockTime(aup)),
               s = VM.sig4Dig(r),
               nbb = this.numberSize(s + extra, 9),
               nobb = this.numberSize(s, 9),

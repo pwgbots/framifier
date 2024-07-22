@@ -122,22 +122,20 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     }
     
     function initializeDiaFRAM() {
-      // Protect user from unintentionally closing the browser
+      // Protect user from unintentionally closing the browser.
       window.onbeforeunload = () => { return 'Exit diaFRAM?'; };
-      // NOTE: first create UI and Documentation Manager to report messages
-      UI = new GUIController();
+      // NOTE: first create Controller and Documentation Manager to
+      // report messages.
+      UI = new Controller();
       UI.addListeners();
       DOCUMENTATION_MANAGER = new DocumentationManager();
-      // Create the virtual machine
-      VM = new VirtualMachine();
-      // Create the GUI-only objects
       UNDO_STACK = new UndoStack();
+      MONITOR = new Monitor();
+      VM = new VirtualMachine();
       ACTOR_MANAGER = new ActorManager();
       X_EDIT = new ExpressionEditor();
       FINDER = new Finder();
-      // NOTE: Instantiate the GUI classes, not their superclasses
-      FILE_MANAGER = new GUIFileManager();
-      MONITOR = new GUIMonitor();
+      FILE_MANAGER = new FileManager();
       // Initialize auto-saving function
       AUTO_SAVE = new ModelAutoSaver();
       // Create a new diaFRAM model
@@ -601,36 +599,15 @@ where X can be one or several of these letters: AFLS
     <div id="finder-resize" class="resizer"></div>
   </div>
 
-  <!-- the MONITOR dialog shows solver progress and messages, and model equations -->
+  <!-- the MONITOR dialog shows simulation progress and messages -->
   <div id="monitor-dlg" class="inp-dlg">
-    <div id="monitor-hdr" class="dragger dlg-title">Solver monitor
+    <div id="monitor-hdr" class="dragger dlg-title">Simulation monitor
       <img id="monitor-close-btn" class="close-btn" src="images/close.png">
     </div>
-    <div id="monitor-tabs" class="tabs">
-      <div id="monitor-msg-tab" class="tab sel-tab"
-           title="Any text output from the MILP solver">
-        Messages
-      </div>
-      <div id="monitor-vbl-tab" class="tab"
-           title="Legend to variables (numbers are column indices in Simplex tableau)">
-        Variables
-      </div>
-      <div id="monitor-eqs-tab" class="tab"
-           title="Equations of the MILP problem submitted to the solver">
-        Equations
-      </div>
-    </div>
     <textarea id="monitor-msg" autocomplete="off" autocorrect="off"
-        autocapitalize="off" spellcheck="false" hidden="hidden"></textarea>
-    <textarea id="monitor-vbl" autocomplete="off" autocorrect="off"
-        autocapitalize="off" spellcheck="false" hidden="hidden"></textarea>
-    <textarea id="monitor-eqs" autocomplete="off" autocorrect="off"
-        autocapitalize="off" spellcheck="false" hidden="hidden"></textarea>
-    <div id="monitor-blocks">1/1</div>
-    <div id="monitor-timer">00:00</div>
-    <div id="monitor-progress">
-      <div id="monitor-progress-bar"></div>
-    </div>
+        autocapitalize="off" spellcheck="false"></textarea>
+    <div id="monitor-ticks"></div>
+    <div id="monitor-timer" title="Computation time">00:00</div>
     <div id="monitor-resize" class="resizer"></div>
   </div>
   

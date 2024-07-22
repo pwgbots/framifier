@@ -3,7 +3,7 @@ diaFRAM is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-r-controller.js) provides the GUI controller
+This JavaScript file (diafram-controller.js) provides the GUI controller
 functionality for the FRAM model editor: buttons on the main tool bars,
 the associated modal dialogs (class ModalDialog), and the related event
 handler functions.
@@ -76,8 +76,8 @@ class ModalDialog {
 } // END of class ModalDialog
 
 
-// CLASS GUIController implements the diaFRAM GUI
-class GUIController {
+// CLASS Controller implements the diaFRAM GUI
+class Controller {
   constructor() {
     this.modals = {};
     this.buttons = {};
@@ -581,7 +581,8 @@ class GUIController {
     this.clearStatusLine();
     this.drawDiagram(MODEL);
     MODEL.t = 0;
-    UI.updateTimeStep();
+    this.updateTimeStep();
+    this.setProgressNeedle(0);
   }
 
   get color() {
@@ -1348,7 +1349,7 @@ class GUIController {
         con.style.cursor = 'pointer';
         con.style.stroke = 'Blue';
         con.style.strokeWidth = 2;
-        con.style.fill = UI.color.active_fill;
+        con.style.fill = UI.color.connecting_fill;
         con.nextSibling.style.fill = 'Navy';
         if(UI.from_connector && UI.from_activity) {
           UI.to_connector = con;
@@ -1362,7 +1363,7 @@ class GUIController {
         con.style.cursor = 'default';
         UI.on_connector = '';
       } else {
-        con.style.stroke = UI.color.active_rim;
+        con.style.stroke = UI.color.connecting;
         con.style.strokeWidth = 1.5;
         con.style.cursor = 'pointer';
       }
@@ -1832,7 +1833,7 @@ class GUIController {
     if((e.shiftKey || e.altKey || e.ctrlKey ||
         this.on_note || this.on_activity || this.on_link) &&
             this.stayActive) {
-      resetActiveButton();
+      this.resetActiveButton();
     }
     // NOTE: Only left button is detected (browser catches right menu button).
     if(e.ctrlKey) {
@@ -2326,6 +2327,7 @@ class GUIController {
       MODEL.t = Math.max(0, MODEL.t - dt);
       UI.updateTimeStep();
       UI.drawDiagram(MODEL);
+      MONITOR.updateDialog();
     }
   }
   
@@ -2336,6 +2338,7 @@ class GUIController {
       MODEL.t = Math.min(MODEL.run_length, MODEL.t + dt);
       UI.updateTimeStep();
       UI.drawDiagram(MODEL);
+      MONITOR.updateDialog();
     }
   }
   
@@ -2459,7 +2462,7 @@ class GUIController {
     }
   }
   
-  // Visual feedback for time-consuming actions
+  // Visual feedback for time-consuming actions.
   waitingCursor() {
     document.body.className = 'waiting';
   }
@@ -2468,8 +2471,8 @@ class GUIController {
     document.body.className = '';
   }
 
-  setProgressNeedle(fraction, color='#500080') {
-    // Shows a thin purple line just above the status line to indicate progress
+  setProgressNeedle(fraction, color='#0080f0') {
+    // Show a thin blue line just above the status line to indicate progress.
     const el = document.getElementById('set-up-progress-bar');
     el.style.width = Math.round(Math.max(0, Math.min(1, fraction)) * 100) + '%';
     el.style.backgroundColor = color;
@@ -3278,5 +3281,5 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     X_EDIT.editExpression(a, c);
   }
   
-} // END of class GUIController
+} // END of class Controller
 

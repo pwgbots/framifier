@@ -91,6 +91,8 @@ function hoursToString(hrs, secs=true) {
   // days, and the seconds :ss are omitted when `secs` is FALSE.
   // NOTE: A negative hour value is returned as such.
   if(hrs < 0) return hrs.toPrecision(4);
+  // Add a fraction of a second to prevent rounding down almost full seconds.
+  hrs += 0.49 / 3600;
   const
       d = Math.floor(hrs / 24),
       h = Math.floor(hrs - 24 * d),

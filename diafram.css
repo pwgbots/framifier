@@ -957,10 +957,10 @@ img.inline-cancel-btn {
 }
 
 #docu-viewer {
-  height: (100% - 15px);
+  height: calc(100% - 15px);
   overflow-y: auto;
   font-family: serif;
-  font-size: 12pt;
+  font-size: 9pt;
   background-color: rgba(245, 251, 254, 0.5);
   user-select: text;
 }
@@ -1416,10 +1416,6 @@ img.finder {
   max-width: 99vw;
 }
 
-#monitor-tabs {
-  width: calc(100% - 5px);
-}
-
 #monitor-clear-btn {
   color: #603000;
   background-color: white;
@@ -1431,19 +1427,16 @@ img.finder {
   box-shadow: inset #f0c0a0 0 0 11px 2px; 
 }
 
-#monitor-msg,
-#monitor-vbl,
-#monitor-eqs,
-#monitor-trc {
+#monitor-msg {
   margin: 2px;
   padding-top: 3px;
   width: calc(100% - 5px);
-  height: calc(100% - 64px);
+  height: calc(100% - 45px);
   font: 12px monospace;
   border: 1px solid Black;
 }
 
-#monitor-blocks {
+#monitor-ticks {
   position: absolute;
   bottom: 4px;
   left: 2px;
@@ -1452,7 +1445,7 @@ img.finder {
 #monitor-timer {
   position: absolute;
   bottom: 4px;
-  left: 64px;
+  right: 20px;
   min-width: 43px;
   text-align: right;
 }
@@ -1510,34 +1503,6 @@ div.sel-pb {
 div.error-pb {
   background-color: rgba(210, 0, 0, 0.7);
   min-width: 1%;
-}
-
-/* tab panes */
-/* NOTE: tabs appear "button style" to look the same across browsers */
-div.tabs {
-  margin: 3px 2px -1px 2px;
-}
-
-div.tab {
-  color: gray;
-  border: 1px solid gray;
-  border-radius: 4px;
-  display: inline-block;
-  padding-left: 2px;
-  padding-right: 2px;
-  margin-bottom: 2px;
-  cursor: pointer;
-}
-
-div.tab:hover {
-  background-color: #fefafc;
-}
-
-div.sel-tab {
-  color: Black;
-  background-color: white;
-  border: 1px solid Black;
-  box-shadow: inset #bfc0e2 0 0 7px 2px; 
 }
 
 #call-stack-dlg {

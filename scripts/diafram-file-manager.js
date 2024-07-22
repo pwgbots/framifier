@@ -29,8 +29,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// CLASS GUIFileManager
-class GUIFileManager {
+// CLASS FileManager
+class FileManager {
    constructor() {
     this.last_file_name = '';
     this.last_file_extension = '';
@@ -167,4 +167,4 @@ class GUIFileManager {
     e.click();
   }  
  
-} // END of class GUIFileManager
+} // END of class FileManager

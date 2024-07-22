@@ -895,7 +895,7 @@ class diaFRAMModel {
     }
     let obj,
         fc = this.focal_activity;
-    // Update the documentation manager (GUI only) if selection contains the
+    // Update the documentation manager if selection contains the
     // current entity.
     if(DOCUMENTATION_MANAGER) DOCUMENTATION_MANAGER.clearEntity(this.selection);
     // First delete links and constraints.
@@ -1424,7 +1424,7 @@ class diaFRAMModel {
       ax[i].compile();
     }
   }
-  
+    
 } // END of class diaFRAMModel
 
 
@@ -1847,10 +1847,9 @@ class Aspect extends NodeBox {
            r = x.result(MODEL.t),
            rs = VM.sig4Dig(r),
            rp = r === VM.PENDING,
-           xrt = (rp ? x.after_points[MODEL.t] :
-              (x.time_until ? x.until_points[MODEL.t] : false)),
+           xrt = (rp ? x.after_points[MODEL.t] : x.until_points[MODEL.t]),
            sym = (rp ? '' : ' \u25D4'),
-           xrs = (xrt === false ? '' :
+           xrs = (!xrt && xrt !== 0 ? '' :
               `<span style="color: #f07000">${sym}${UI.clockTime(xrt)}</span>`);
         extra += ` = <span style="color: blue">${rs}${xrs}</span>`;
       }
@@ -1899,6 +1898,16 @@ class Aspect extends NodeBox {
       }
     }
     return true;
+  }
+  
+  isLasting(t) {
+    // Return TRUE if this aspect has a "lasting" value due to some
+    // UNTIL operator.
+    const
+        x = this.expression,
+        up = x.defined && x.until_points[t];
+    // NOTE: A setpoint of 0 is meaningful, so do not return FALSE then. 
+    return up || up === 0;
   }
   
   removeFromLink(l) {
@@ -2207,6 +2216,18 @@ class Activity extends NodeBox {
     return ia;
   }
   
+  aspectOfIncomingExpression(x) {
+    // Return the aspect letter if `x` is an incoming expression of this
+    // activity, or otherwise an empty string.
+    for(let k in this.incoming_expressions) {
+      if(this.incoming_expressions.hasOwnProperty(k) &&
+          this.incoming_expressions[k] === x) {
+        return k;
+      }
+    }
+    return '';
+  }
+  
   stateChanged(t) {
     // Return TRUE if any of the aspects has changed compared to tick t-1.
     let change = false;
@@ -2232,6 +2253,21 @@ class Activity extends NodeBox {
     return change;
   }
 
+  stateChanges(t) {
+    // Return changes in aspectscompared to tick t-1 as a string.
+    let changes = [];
+    for(let i = 0; i < 6; i++) {
+      const
+          // NOTE: Input first, Output last.
+          k = 'IPTCRO'.charAt(i), 
+          ps = (t <= 0 ? null : this.state[k][t - 1]),
+          cs = this.state[k][t];
+      if(cs !== ps) changes.push(
+          `${UI.aspect_type[k]} ${VM.sig4Dig(ps)} \u2192 ${VM.sig4Dig(cs)}`);
+    }
+    return changes.join(', ');
+  }
+
   activated(t) {
     // Return TRUE iff O aspect is TRUE for tick t but not for tick t-1.
     return (MODEL.solved && this.state.O[t] === 1 &&
@@ -2243,9 +2279,11 @@ class Activity extends NodeBox {
   }
   
   activeColor(t) {
-    if(this.activated(t)) return UI.color.active_rim;
+    if(this.activated(t)) return UI.color.activated;
     if(this.active_since < 0) return UI.color.rim;
-    return `rgb(0, ${Math.max(64, 160 - t + this.active_since)}, 48)`;
+    const green = Math.min(176,
+        Math.max(64, 160 - 8 * (t - this.active_since)));
+    return `rgb(32, ${green}, 48)`;
   }
   
   containsActivity(a) {
@@ -2435,10 +2473,11 @@ class Activity extends NodeBox {
   }
   
   linkInList(l, list) {
-    // Returns TRUE iff both the FROM node and the TO node of link/constraint
-    // `l` are elements of `list`
-    // NOTE: this method used in diafram-ctrl.js to see which links are
-    // to be included when the modeler performs a "rectangular area select".
+    // Return TRUE iff both the FROM node and the TO node of link `l`
+    // are elements of `list`.
+    // NOTE: This method used in diafram-controller.js to see which links
+    // are to be included when the modeler performs a "rectangular area
+    // selection".
     const
         f_in = list.indexOf(l.from_activity) >= 0,
         t_in = list.indexOf(l.to_activity) >= 0;
@@ -2526,7 +2565,6 @@ class Activity extends NodeBox {
     for(let k in ix) if(ix.hasOwnProperty(k)) {
       s[k][t] = ix[k].result(t);
     }
-console.log('HERE time state for', this.displayName, VM.sig4Dig(s.T[t]));
     // Review all CRPIT, and apply the default rules if their state still
     // is "not computed" or "undefined".
     for(let k in s) if('CRPIT'.indexOf(k) >= 0) {
@@ -2719,7 +2757,10 @@ class Link {
     } else {
       as = this.from_activity.active_since;
     }
-    if(as >= 0 && as < t) return `rgb(0, ${Math.max(64, 160 - t + as)}, 48)`;
+    if(as >= 0 && as < t) {
+      const green = Math.min(176, Math.max(64, 160 - 8 * (t - as)));
+      return `rgb(32, ${green}, 48)`;
+    }
     return UI.color.rim;
   }
   

@@ -238,10 +238,7 @@ class Expression {
     }
     // Now check the AFTER setpoint, as it may have been set by this
     // expression, and then the result should be "PENDING".
-    if(this.time_after !== false) {
-      console.log('HERE ta v aspts', MODEL.clock_time[t], this.time_after, v[t], VM.event_setpoints);
-      v[t] = VM.PENDING;
-    }
+    if(this.time_after !== false) v[t] = VM.PENDING;
     this.trace('RESULT = ' + VM.sig4Dig(v[t]));
     // Store result in the vector.
     this.vector[t] = v[t];
@@ -1110,13 +1107,11 @@ class VirtualMachine {
     // Let the model know that it should no longer display results in
     // the model diagram. 
     MODEL.solved = false;
-    // NOTE: time etc. still has to be implemented.
-    this.nr_of_time_steps = 100;
 
     // Initialize error counters (error count will be reset to 0 for each
-    // block).
+    // tick).
     this.error_count = 0;
-    this.block_issues = 0;
+    this.tick_issues = 0;
     // Clear issue list with warnings and hide issue panel.
     this.issue_list.length = 0;
     this.issue_index = -1;
@@ -1279,19 +1274,16 @@ class VirtualMachine {
     if(DEBUGGING) console.log(trc);
   }
 
-  logMessage(block, msg) {
+  logMessage(tick, msg) {
     // Add a solver message to the list.
-    // NOTE: block number minus 1, as array is zero-based.
-    if(this.messages[block - 1] === this.no_messages) {
-      this.messages[block - 1] = '';
+    if(!this.messages[tick] || this.messages[tick] === this.no_messages) {
+      this.messages[tick] = '';
     }
-    this.messages[block - 1] += msg + '\n';
+    this.messages[tick] += msg + '\n';
     if(msg.startsWith(this.WARNING)) {
       this.error_count++;
       this.issue_list.push(msg);
     }
-    // Show message on console or in Monitor dialog.
-    MONITOR.logMessage(block, msg);
   }
   
   startTimer() {
@@ -1329,56 +1321,121 @@ class VirtualMachine {
     return result;
   }
   
+  pendingAndLastingExpressions() {
+    // Return lists of expressions having pending (AFTER) or lasting
+    // (UNTIL) status.
+    // NOTE: This method should be called only while running a simulation.
+    const
+        ax = MODEL.allExpressions,
+        pl = {pending: [], lasting: []};
+    for(let i = 0; i < ax.length; i++) {
+      const
+          x = ax[i],
+          o = x.object,
+          dn = o.displayName,
+          c = (o instanceof Activity ? o.aspectOfIncomingExpression(x) : ''),
+          cc = (c ? circledLetter(c) : '');
+      if(x.time_after !== false) {
+        pl.pending.push(`${cc}${dn}: ${UI.clockTime(x.time_after)}`);
+      }
+      if(x.time_until !== false) {
+        const r = this.sig4Dig(x.result(this.t));
+        pl.lasting.push(`${cc}${dn}: ${r} until ${UI.clockTime(x.time_until)}`);
+      }
+    }
+    return pl;
+  }
+
   solveModel() {
     // Perform successive "cycles" for the set run length.
     this.reset();
+    MONITOR.reset();
+    this.startTimer();
+    this.logMessage(0, `Simulation started at ${new Date().toString()}\n`);
     // First establish the most logical function sequence.
-    const seq = MODEL.triggerSequence;
+    this.sequence = MODEL.triggerSequence;
     this.t = 0;
-    // Then iterate throught the simulation period.
-    while(this.t <= MODEL.run_length) {
-console.log('HERE t setpoints', this.t, this.event_setpoints.toString());
-      if(this.t > 0) {
-        if(this.event_setpoints.length) {
-          // Advance to the next relevant point in time, and remove it
-          // from the list of event setpoints.
-          this.event_setpoints.sort();
-          MODEL.clock_time[this.t] = this.event_setpoints.shift();
-        } else {
-          // Time does not advance.
-          MODEL.clock_time[this.t] = MODEL.clock_time[this.t - 1];
-        }
-console.log('HERE clock time vector', MODEL.clock_time.slice(0, this.t + 2));
-      }
-      for(let k in seq) if(seq.hasOwnProperty(k)) {
-        const s = seq[k];
-        let change = false;
-        for(let j = 0; j < s.length; j++) {
-          const uas = s[j].updateState(VM.t);
-          change = change || uas;
-        }
-      }
-      // Increase the cycle "tick".
-      this.t++;
+    MONITOR.updateDialog();
+    UI.startSolving();
+    // Start iterating throught the simulation period.
+    setTimeout(() => VM.runCycle(), 10);
+  }
+  
+  runCycle() {
+    if(this.t > MODEL.run_length) {
+      this.terminateRun();
+      return;
     }
+    this.logMessage(this.t, 'Cycle #' + this.t);
+    let new_time = '';
+    if(this.t > 0) {
+      if(this.event_setpoints.length) {
+        // Advance to the next relevant point in time, and remove it
+        // from the list of event setpoints.
+        this.event_setpoints.sort();
+        MODEL.clock_time[this.t] = this.event_setpoints.shift();
+        new_time = UI.clockTime(MODEL.clock_time[this.t]);
+      } else {
+        // Time does not advance.
+        MODEL.clock_time[this.t] = MODEL.clock_time[this.t - 1];
+      }
+    }
+    const changes = [];
+    for(let k in this.sequence) if(this.sequence.hasOwnProperty(k)) {
+      const s = this.sequence[k];
+      for(let j = 0; j < s.length; j++) {
+        const uas = s[j].updateState(VM.t);
+        if(uas) {
+          changes.push(`${s[j].displayName}: ${s[j].stateChanges(VM.t)}`);        
+        }
+      }
+    }
+    this.logMessage(this.t, pluralS(changes.length, 'state change'));
+    if(changes.length) {
+      changes.sort();
+      this.logMessage(this.t, '- ' + changes.join('\n- '));
+    }
+    if(new_time) this.logMessage(this.t, '\nClock time advanced to ' +
+            new_time + '\n');
+    const
+        pl = this.pendingAndLastingExpressions(),
+        np = pl.pending.length,
+        nl = pl.lasting.length;
+    if(np) {
+      this.logMessage(this.t, pluralS(np, 'pending expression value'));
+      pl.pending.sort();
+      this.logMessage(this.t, '- ' + pl.pending.join('\n- '));
+    }
+    if(nl) {
+      this.logMessage(this.t, pluralS(nl, 'lasting expression value'));
+      pl.lasting.sort();
+      this.logMessage(this.t, '- ' + pl.lasting.join('\n- '));
+    }
+    MONITOR.updateDialog();
+    MONITOR.updateMonitorTime();
+    UI.setProgressNeedle(this.t / MODEL.run_length);
+    // Modeler may interrupt the simulation.
+    if(this.halted) {
+      UI.notify('Simulation was aborted -- results will be partial');
+      this.logMessage(this.t,
+          `\n*** Simulation aborted at ${new Date().toString()} ***`);
+      this.terminateRun();
+      return;
+    }
+    // Otherwise, increase the cycle "tick"...
+    this.t++;
+    // ... and proceed asynchronously with the next cycle, so the process
+    // can be interrupted by the modeler.
+    setTimeout(() => VM.runCycle(), 10);
+  }
+  
+  terminateRun() {
     MODEL.solved = true;
     this.stopSolving();
     MODEL.t = 0;
     UI.drawDiagram(MODEL);
     UI.updateTimeStep();
-  }
-  
-  calculateDependentVariables(block) {
-    // Calculate the values of all model variables that depend on the
-    // values of the decision variables output by the solver.
-    // NOTE: Add a blank line to separate from next round (if any).
-    this.logMessage(block,
-        `Calculating dependent variables took ${this.elapsedTime} seconds.\n`);
-  }
-  
-  hideSetUpOrWriteProgress() {
-    this.show_progress = false;
-    UI.setProgressNeedle(0);
+    MONITOR.updateDialog();
   }
   
   logCode() {
@@ -1413,7 +1470,7 @@ console.log('HERE clock time vector', MODEL.clock_time.slice(0, this.t + 2));
   }
 
   halt() {
-    // Abort solving process. This prevents submitting the next block.
+    // Abort solving process.
     UI.waitToStop();
     this.halted = true;
   }
@@ -1471,7 +1528,7 @@ function VMI_push_last_activation(x) {
   // or 0 when this owner is not an aspect.
   const act = (x.object instanceof Aspect ? x.object.parent : x.object);
   let t = x.step[x.step.length - 1];
-  if(true||DEBUGGING) {
+  if(DEBUGGING) {
     console.log(`push last activation of ${act.displayName} (t = ${t})`);
   }
   let lat = 0;
@@ -1484,7 +1541,7 @@ function VMI_push_last_activation(x) {
     lat = MODEL.clock_time[t];
   }
   x.push(lat);
-  if(true||DEBUGGING) console.log(`last activation = ${UI.clockTime(lat)}`);
+  if(DEBUGGING) console.log(`last activation = ${UI.clockTime(lat)}`);
 }
 
 function VMI_push_random(x) {
@@ -1509,8 +1566,9 @@ function VMI_after(x) {
       t = x.step[x.step.length - 1],
       ct = MODEL.clock_time[t],
       d = x.top();
-  if(true||DEBUGGING) {
-    console.log(`AFTER ${d} (clock time: ${ct}, setpoint: ${x.time_after})`);
+  if(DEBUGGING) {
+    console.log('AFTER', d, 'for', x.object.displayName,
+        `(t = ${t}, clock time: ${ct}, setpoint: ${x.time_after})`);
   }
   if(d !== false) {
     if(d <= ct) {
@@ -1523,9 +1581,7 @@ function VMI_after(x) {
       x.after_points[t] = d;
       // NOTE: Points in time are stored as floating point numbers.
       addDistinct(d, VM.event_setpoints); 
-console.log('HERE setpoint added', VM.event_setpoints);
     }
-console.log('HERE x.after_points', x.object.displayName, x.after_points);
   }
 }
 
@@ -1539,23 +1595,30 @@ function VMI_until(x) {
       t = x.step[x.step.length - 1],
       ct = MODEL.clock_time[t],
       d = x.top();
-  if(true||DEBUGGING) {
-    console.log(`UNTIL ${d} (clock time: ${ct}, setpoint: ${x.time_until})`);
+  if(DEBUGGING) {
+    console.log('UNTIL', d, 'for', x.object.displayName,
+        `(t = ${t}, clock time: ${ct}, setpoint: ${x.time_until})`);
   }
   if(d !== false) {
-    if(d <= ct) {
+    if(d < ct) {
       x.retop(0);
       x.time_until = false;
       x.until_points[t] = false;
     } else {
       x.retop(1);
-      x.time_until = d;
-      x.until_points[t] = d;
-      // NOTE: Points in time are stored as floating point numbers.
-      addDistinct(d, VM.event_setpoints); 
-console.log('HERE setpoint added', VM.event_setpoints);
+      // When no setpoint, use 0 for comparison with `d`.
+      const tu = x.time_until || 0;
+      if(d > tu) {
+        // Only add new setpoint when UNTIL time lies beyond the current
+        // setpoint
+        x.until_points[t] = d;
+        x.time_until = d;
+        addDistinct(d, VM.event_setpoints);
+      } else {
+        // No change in UNTIL setpoint, so record the current one.
+        x.until_points[t] = tu;        
+      }
     }
-console.log('HERE x.until_points', x.object.displayName, x.until_points);
   }
 }
 
@@ -1771,9 +1834,9 @@ function VMI_push_statistic(x, args) {
       t2 = t;
     }
   }
-  // Negative time step is evaluated as t = 0 (initial value) t beyond
-  // optimization period is evaluated as its last time step
-  const tmax = VM.nr_of_time_steps;
+  // Negative tick is evaluated as t = 0 (initial value),and tick beyond
+  // run length is evaluated as its last tick.
+  const tmax = MODEL.run_length;
   t1 = Math.max(0, Math.min(tmax, t1));
   t2 = Math.max(0, Math.min(tmax, t2));
   // Trace only now that time step range has been computed
