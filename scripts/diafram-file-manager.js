@@ -83,9 +83,7 @@ class FileManager {
   }
 
   saveModel() {
-    // Save the current model either as a download (directly from the browser),
-    // or in the user workspace (via the server) when the Save button is
-    // Shift-clicked.
+    // Save the current model as a download (directly from the browser).
     MODEL.clearSelection();
     // NOTE: Encode hashtags, or they will break the URI.
     this.pushModelToBrowser(MODEL.asXML.replace(/#/g, '%23'));
@@ -145,9 +143,9 @@ class FileManager {
     }
   }
   
-  saveDiagramAsSVG(tight) {
+  saveDiagramAsSVG(event) {
     // Output SVG as string with nodes and arrows 100% opaque.
-    if(tight) {
+    if(event.shiftKey) {
       // First align to grid and then fit to size.
       MODEL.alignToGrid();      
       UI.paper.fitToSize(1);
@@ -155,13 +153,46 @@ class FileManager {
       UI.paper.fitToSize();
       MODEL.alignToGrid();      
     }
-    this.pushOutSVG(UI.paper.opaqueSVG);
+    if(event.altKey) {
+      this.pushOutSVG(UI.paper.opaqueSVG);
+    } else {
+      const
+          svg = UI.paper.opaqueSVG,
+          uri = 'data:image/svg+xml;base64,' + window.btoa(svg),
+          img = new Image();
+      img.onload = () => {
+          const
+              cvs = document.createElement('canvas'),
+              ctx = cvs.getContext('2d');
+          cvs.width = img.width * 4;
+          cvs.height = img.height * 4;
+          ctx.scale(4, 4);
+          ctx.drawImage(img, 0, 0);
+          cvs.toBlob(blob => {
+              const
+                  e = document.getElementById('svg-saver'),
+                  url = (window.URL || webkitURL).createObjectURL(blob),
+                  name = fileName(MODEL.focal_activity.parent ?
+                      MODEL.focal_activity.displayName : MODEL.name) ||
+                  'FRAM-model';
+              e.download = name + '.png';
+              e.type = 'image/png';
+              e.href = url;
+              e.click();
+            });
+      };
+      img.src = uri;      
+    }
   }
   
   pushOutSVG(svg) {
-    const blob = new Blob([svg], {'type': 'image/svg+xml'});
-    const e = document.getElementById('svg-saver');
-    e.download = 'model.svg';
+    const
+        blob = new Blob([svg], {'type': 'image/svg+xml'}),
+        e = document.getElementById('svg-saver'),
+        name = fileName(MODEL.focal_activity.parent ?
+            MODEL.focal_activity.displayName : MODEL.name) ||
+        'FRAM-model';
+    e.download = name + '.svg';
     e.type = 'image/svg+xml';
     e.href = (window.URL || webkitURL).createObjectURL(blob);
     e.click();

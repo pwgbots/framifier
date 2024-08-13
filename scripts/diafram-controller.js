@@ -204,7 +204,6 @@ class Controller {
       'L': 'load',
       'M': 'monitor', // Alt-M will open the model settings dialog
       // Ctrl-N will still open a new browser window.
-      'P': 'diagram', // P for PNG (Portable Network Graphics image)
       'Q': 'stop',
       'R': 'solve', // runs the simulation
       'S': 'save',
@@ -627,9 +626,9 @@ class Controller {
     this.buttons.settings.addEventListener('click',
         () => UI.showSettingsDialog(MODEL));
     this.buttons.save.addEventListener('click',
-        () => FILE_MANAGER.saveModel(event.shiftKey));
+        () => FILE_MANAGER.saveModel());
     this.buttons.savediagram.addEventListener('click',
-        () => FILE_MANAGER.saveDiagramAsSVG(event.shiftKey));
+        () => FILE_MANAGER.saveDiagramAsSVG(event));
     this.buttons.actors.addEventListener('click',
         () => ACTOR_MANAGER.showDialog());
     // NOTE: All draggable & resizable dialogs "toggle" show/hide.
@@ -954,7 +953,7 @@ class Controller {
     // Display cycle tick `t` as the current cycle number.
     document.getElementById('step').innerText = t;
     document.getElementById('clock-time').innerHTML =
-        `&#x231A;${this.clockTime(MODEL.simulationTime)}`;
+        this.clockTime(MODEL.simulationTime);
   }
   
   stopSolving() {
@@ -2171,11 +2170,6 @@ class Controller {
       } else if(code === 'ArrowRight') {
         e.preventDefault();
         this.stepForward(e);
-      } else if(e.ctrlKey && code === 'KeyS') {
-        // Ctrl-S means: save model. Treat separately because Shift-key
-        // alters the way in which the model file is saved.
-        e.preventDefault();
-        FILE_MANAGER.saveModel(e.shiftKey);
       } else if(alt && ['KeyC', 'KeyM'].indexOf(code) >= 0) {
         // Special shortcut keys for "clone selection" and "model settings".
         const be = new Event('click');
@@ -2325,8 +2319,8 @@ class Controller {
     if(MODEL.t > 0) {
       const dt = (e.shiftKey ? 10 : 1) * (e.ctrlKey || e.metaKey ? 100 : 1);
       MODEL.t = Math.max(0, MODEL.t - dt);
-      UI.updateTimeStep();
-      UI.drawDiagram(MODEL);
+      this.updateTimeStep();
+      this.drawDiagram(MODEL);
       MONITOR.updateDialog();
     }
   }
@@ -2336,8 +2330,8 @@ class Controller {
     if(MODEL.t < MODEL.run_length) {
       const dt = (e.shiftKey ? 10 : 1) * (e.ctrlKey || e.metaKey ? 100 : 1);
       MODEL.t = Math.min(MODEL.run_length, MODEL.t + dt);
-      UI.updateTimeStep();
-      UI.drawDiagram(MODEL);
+      this.updateTimeStep();
+      this.drawDiagram(MODEL);
       MONITOR.updateDialog();
     }
   }

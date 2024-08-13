@@ -29,25 +29,6 @@ SOFTWARE.
 */
 
 //
-// Functions that facilitate HTTP requests
-//
-
-function postData(obj) {
-  // Converts a JavaScript object to an object that can be passed to a server
-  // in a POST request
-  const fields = [];
-  for(let k in obj) if(obj.hasOwnProperty(k)) {
-    fields.push(encodeURIComponent(k) + "=" + encodeURIComponent(obj[k]));
-  }
-  return {
-      method: 'post',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      mode: 'no-cors',
-      body: fields.join('&')
-    };
-}
-
-//
 // Functions that convert numbers to strings, or strings to numbers
 //
 
@@ -58,13 +39,6 @@ function pluralS(n, s, special='') {
       // NOTE: To accomodate for plural form of ex-ante unknown entity types,
       // nouns ending on "s" (specifically "process") form a special case .
       (n === 1 ? s : (special ? special : s + (s.endsWith('s') ? 'es' : 's')));
-}
-
-function circledLetter(l) {
-  // Return Unicode character for circled connector (aspect) letter `l`.
-  const i = 'CORPIT'.indexOf(l);
-  if(l < 0) return '';
-  return ['\u24B8', '\u24C4', '\u24C7', '\u24C5', '\u24BE', '\u24C9'][i];
 }
 
 function safeStrToFloat(str, val=0) {
@@ -177,6 +151,18 @@ function uniformDecimals(data) {
       data[i] = f.toFixed(Math.min(4 - maxi, maxf));
     }
   }
+}
+
+function circledLetter(l) {
+  // Return Unicode character for circled connector (aspect) letter `l`.
+  const i = 'CORPIT'.indexOf(l);
+  if(l < 0) return '';
+  return ['\u24B8', '\u24C4', '\u24C7', '\u24C5', '\u24BE', '\u24C9'][i];
+}
+
+function fileName(s) {
+  // Return string `s` as a file name that can be used cross-platform.
+  return s.replace(/[^A-Za-z0-9]+/g, '-');
 }
 
 function capitalized(s) {
