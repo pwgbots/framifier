@@ -1,15 +1,15 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-config.js) defines global constants that specify
+This JavaScript file (framifier-config.js) defines global constants that specify
 the URLs for the solver, and for the sound files that are played when error,
 warning or information messages are displayed.
 */
 
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

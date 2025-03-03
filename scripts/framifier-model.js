@@ -1,14 +1,14 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-model.js) defines the object classes that
-represent the diaFRAM model and its composing entities.
+This JavaScript file (framifier-model.js) defines the object classes that
+represent the FRAMifier model and its composing entities.
 */
 
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,8 +29,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// CLASS diaFRAMModel
-class diaFRAMModel {
+// CLASS FRAMifierModel
+class FRAMifierModel {
   constructor(name, author) {
     this.name = name;
     this.author = author;
@@ -44,7 +44,7 @@ class diaFRAMModel {
     const d = new Date();
     this.time_created = d;
     this.last_modified = d;
-    this.version = DIAFRAM_VERSION;
+    this.version = FRAMIFIER_VERSION;
     this.actors = {};
     this.activities = {};
     this.aspects = {};
@@ -1179,7 +1179,7 @@ class diaFRAMModel {
     let xml = this.xml_header + ['<model', p, '><name>',  xmlEncoded(this.name),
         '</name><author>', xmlEncoded(this.author),
         '</author><comments>', xmlEncoded(this.comments),
-        '</comments><version>',  xmlEncoded(DIAFRAM_VERSION),
+        '</comments><version>',  xmlEncoded(FRAMIFIER_VERSION),
         '</version><last-saved>',  xmlEncoded(this.last_modified.toString()),
         '</last-saved><grid-pixels>', this.grid_pixels,
         '</grid-pixels><actors>'].join('');
@@ -1425,7 +1425,7 @@ class diaFRAMModel {
     }
   }
     
-} // END of class diaFRAMModel
+} // END of class FRAMifierModel
 
 
 // CLASS Actor
@@ -1891,6 +1891,7 @@ class Aspect extends NodeBox {
   
   get isTimeAspect() {
     // Return TRUE if this aspect occurs only on links that relate to Time.
+    if(!this.parent) return false;
     const ol = this.parent.connections.O;
     for(let i = 0; i < ol.length; i++) {
       if(ol[i].to_connector !== 'T' && ol[i].aspects.indexOf(this) >= 0) {
@@ -2475,7 +2476,7 @@ class Activity extends NodeBox {
   linkInList(l, list) {
     // Return TRUE iff both the FROM node and the TO node of link `l`
     // are elements of `list`.
-    // NOTE: This method used in diafram-controller.js to see which links
+    // NOTE: This method used in framifier-controller.js to see which links
     // are to be included when the modeler performs a "rectangular area
     // selection".
     const

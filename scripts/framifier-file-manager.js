@@ -1,14 +1,14 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-file-manager.js) provides the GUI
-functionality for the diaFRAM File Manager.
+This JavaScript file (framifier-file-manager.js) provides the GUI
+functionality for the FRAMifier File Manager.
 */
 
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -59,8 +59,8 @@ class FileManager {
       }
       if(this.last_file_extension === 'xfmv') {
         UI.warn('Some data from FRAM Model Visualiser files will be ingnored'); 
-      } else if(this.last_file_extension != 'dfram') {
-        UI.warn('diaFRAM files should have extension .dfram');
+      } else if(this.last_file_extension != 'framf') {
+        UI.warn('FRAMifier files should have extension .framf');
       }
       const reader = new FileReader();
       // Read XML string from input file, and then parse it.
@@ -90,12 +90,12 @@ class FileManager {
   }
   
   pushModelToBrowser(xml) {
-    // Save model as .dfram file.
+    // Save model as .framf file.
     UI.setMessage('Model file size: ' + UI.sizeInBytes(xml.length));
     const el = document.getElementById('xml-saver');
     el.href = 'data:attachment/text,' + encodeURI(xml);
     console.log('Encoded file size:', el.href.length);
-    el.download = 'model.dfram';
+    el.download = 'model.framf';
     if(el.href.length > 25*1024*1024 &&
         navigator.userAgent.search('Chrome') <= 0) {
       UI.notify('Model file size exceeds browser download limit of 25 MB');

@@ -1,14 +1,14 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-expression-editor.js) provides the GUI
-functionality for the diaFRAM Expression Editor dialog.
+This JavaScript file (framifier-expression-editor.js) provides the GUI
+functionality for the FRAMifier Expression Editor dialog.
 */
 
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -48,9 +48,9 @@ class ExpressionEditor {
     this.help = md.element('help');
     this.insert = md.element('insert');
     this.variables = md.element('variables');
-    // The quick guide to diaFRAM expressions.
+    // The quick guide to FRAMifier expressions.
     this.help.innerHTML = `
-<p><span style="font-size: 13px; font-weight: bold">diaFRAM expressions</span> &ndash;
+<p><span style="font-size: 13px; font-weight: bold">FRAMifier expressions</span> &ndash;
 <em>Move cursor over a</em> <code>symbol</code> <em>for explanation.</em>
 <p>
 <h4>Variables</h4>

@@ -1,15 +1,15 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-actor-manager.js) provides the GUI
-functionality for the diaFRAM actor manager: the modal dialog that
+This JavaScript file (framifier-actor-manager.js) provides the GUI
+functionality for the FRAMifier actor manager: the modal dialog that
 allows renaming actors an changing their color.
 */
 
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

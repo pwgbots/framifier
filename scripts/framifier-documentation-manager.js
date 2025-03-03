@@ -1,15 +1,15 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-documentation-manager.js) provides the GUI
-functionality for the diaFRAM model documentation manager: the draggable
+This JavaScript file (framifier-documentation-manager.js) provides the GUI
+functionality for the FRAMifier model documentation manager: the draggable
 dialog that allows viewing and editing documentation text for model entities.
 */
 
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -140,17 +140,17 @@ class DocumentationManager {
     ];
 
     // Default content to display when no entity is being viewed
-    this.about_diaFRAM = `
+    this.about_FRAMifier = `
 <div style="font-family: sans-serif; font-size: 10px; ">
   <img src="images/logo.png" style="height:25px; margin-right: 4px">
   <div style="display: inline-block; min-height: 20px; font-style: italic;
               vertical-align: top; padding-top: 8px">
-    version ${DIAFRAM_VERSION}
+    version ${FRAMIFIER_VERSION}
   </div>
 </div>
 <div style="font-family: serif; font-size: 12px">
-  <p><a href="https://github.com/pwgbots/diafram" target="blank">Documentation
-    on diaFRAM</a> is still scant, but you can learn a lot by moving the
+  <p><a href="https://github.com/pwgbots/framifier" target="blank">Documentation
+    on FRAMifier</a> is still scant, but you can learn a lot by moving the
     cursor over buttons, and read the tool-tips that then typically will
     appear.
   </p>
@@ -169,7 +169,7 @@ class DocumentationManager {
 
     // Markup guidelines to display when modeler clicks on the info-button
     this.markup_guide = `
-<h3>diaFRAM Markup Conventions</h3>
+<h3>FRAMifier Markup Conventions</h3>
 <p>You can format your documentation text using these markup conventions:</p>
 <table style="width: 100%; table-layout: fixed">
   <tr>
@@ -197,9 +197,9 @@ class DocumentationManager {
     </td>
   </tr>
   <tr>
-    <td class="markup">URLs become links: https://diafram.net</td>
+    <td class="markup">URLs become links: https://framifier.net</td>
     <td class="markdown">URLs become links:
-      <a href="https://diafram.net" target="_blank">https://diafram.net</a>
+      <a href="https://framifier.net" target="_blank">https://framifier.net</a>
     </td>
   </tr>
   <tr>
@@ -269,7 +269,7 @@ class DocumentationManager {
       this.stopEditing();
       this.entity = null;
       this.title.innerHTML = 'Information and documentation';
-      this.viewer.innerHTML = this.about_diaFRAM;
+      this.viewer.innerHTML = this.about_FRAMifier;
     }
   }
   

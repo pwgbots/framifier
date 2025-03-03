@@ -1,13 +1,13 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-utils.js) defines a variety of "helper"
-functions that are used in other diaFRAM modules.
+This JavaScript file (framifier-utils.js) defines a variety of "helper"
+functions that are used in other FRAMifier modules.
 */
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -178,7 +178,7 @@ function ellipsedText(text, n=50, m=10) {
 }
 
 //
-// Functions used when comparing two diaFRAM models.
+// Functions used when comparing two FRAMifier models.
 //
 
 function earlierVersion(v1, v2) {
@@ -732,7 +732,7 @@ function nodeParameterValue(node, param) {
 }
 
 //
-// Functions that support naming and identifying diaFRAM entities
+// Functions that support naming and identifying FRAMifier entities
 //
 
 function letterCode(n) {
@@ -784,7 +784,7 @@ function safeDoubleQuotes(s) {
 }
 
 function nameToLines(name, actor_name='', ratio=0.3) {
-  // Return the name of a diaFRAM entity as a string-with-line-breaks
+  // Return the name of a FRAMifier entity as a string-with-line-breaks
   // that fits nicely in an oblong box. For efficiency reasons, a fixed
   // width/height ratio is assumed, as this produces quite acceptable
   // results. Actor names are not split, so their length may stretch

@@ -1,14 +1,14 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-paper.js) provides the SVG diagram-drawing
-functionality for the diaFRAM model editor.
+This JavaScript file (framifier-paper.js) provides the SVG diagram-drawing
+functionality for the FRAMifier model editor.
 */
 
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@ SOFTWARE.
 
 // CLASS Shape
 // A shape is a group of one or more SVG elements with a time-based ID
-// number, and typically represents an entity in a diaFRAM model diagram.
+// number, and typically represents an entity in a FRAMifier model diagram.
 class Shape {
   constructor() {
     this.id = randomID();
@@ -880,7 +880,7 @@ class Paper {
     // Resize paper if necessary.
     this.extend();
     // Display model name in browser.
-    document.title = mdl.name || 'diaFRAM';
+    document.title = mdl.name || 'FRAMifier';
   }
   
   drawSelection(mdl, dx=0, dy=0) {

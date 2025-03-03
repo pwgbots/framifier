@@ -1,16 +1,16 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-controller.js) provides the GUI controller
+This JavaScript file (framifier-controller.js) provides the GUI controller
 functionality for the FRAM model editor: buttons on the main tool bars,
 the associated modal dialogs (class ModalDialog), and the related event
 handler functions.
 */
 
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -76,7 +76,7 @@ class ModalDialog {
 } // END of class ModalDialog
 
 
-// CLASS Controller implements the diaFRAM GUI
+// CLASS Controller implements the FRAMifier GUI
 class Controller {
   constructor() {
     this.modals = {};
@@ -134,7 +134,7 @@ class Controller {
     // FROM->TO represented by solid right-pointing arrow with curved shaft.
     this.LINK_ARROW = '\u219D';
     
-    // Identify the type of browser in which diaFRAM is running.
+    // Identify the type of browser in which FRAMifier is running.
     const
         ua = window.navigator.userAgent.toLowerCase(),
         browsers = [
@@ -150,9 +150,9 @@ class Controller {
         break;
       }
     }
-    // Display version number as clickable link just below the diaFRAM logo.
-    this.version_number = DIAFRAM_VERSION;
-    this.version_div = document.getElementById('diafram-version-number');
+    // Display version number as clickable link just below the FRAMifier logo.
+    this.version_number = FRAMIFIER_VERSION;
+    this.version_div = document.getElementById('framifier-version-number');
     this.version_div.innerHTML = 'Version ' + this.version_number;
     // Initialize the "paper" for drawing the model diagram.
     this.paper = new Paper();
@@ -381,7 +381,7 @@ class Controller {
   }
   
   validName(name) {
-    // Returns TRUE if `name` is a valid diaFRAM entity name. These names
+    // Returns TRUE if `name` is a valid FRAMifier entity name. These names
     // must not be empty strings, may not contain brackets, backslashes or
     // vertical bars, may not end with a colon, and must start with an
     // underscore, a letter or a digit.
@@ -867,8 +867,8 @@ class Controller {
   loadModelFromXML(xml) {
     // Parse `xml` and update the GUI.
     const loaded = MODEL.parseXML(xml);
-    // If not a valid diaFRAM model, ensure that the current model is clean.
-    if(!loaded) MODEL = new diaFRAMModel();
+    // If not a valid FRAMifier model, ensure that the current model is clean.
+    if(!loaded) MODEL = new FRAMifierModel();
     this.drawDiagram(MODEL);
     if(FILE_MANAGER.last_file_extension === 'xfmv') {
       // Use the file name as model name.
@@ -1277,8 +1277,8 @@ class Controller {
         mgr.updateDialog();
         if(mgr === DOCUMENTATION_MANAGER) {
           if(this.info_line.innerHTML.length === 0) {
-            mgr.title.innerHTML = 'About diaFRAM';
-            mgr.viewer.innerHTML = mgr.about_diaFRAM;
+            mgr.title.innerHTML = 'About FRAMifier';
+            mgr.viewer.innerHTML = mgr.about_FRAMifier;
             mgr.edit_btn.classList.remove('enab');
             mgr.edit_btn.classList.add('disab');
           }
@@ -1736,7 +1736,7 @@ class Controller {
   }
 
   mouseMove(e) {
-    // Responds to mouse cursor moving over diaFRAM diagram area.
+    // Responds to mouse cursor moving over FRAMifier diagram area.
     this.updateCursorPosition(e);
     
     // NOTE: check, as MODEL might still be undefined
@@ -2282,7 +2282,7 @@ class Controller {
     if(txt === '' && ['some field'].indexOf(name) >= 0) return 0;
     const n = parseFloat(txt);
     // NOTE: any valid number ends with a digit (e.g., 100, 100.0, 1E+2),
-    // but parseFloat is more tolerant; however, diaFRAM should not accept
+    // but parseFloat is more tolerant; however, FRAMifier should not accept
     // input such as "100x" nor even "100." 
     if(isNaN(n) || '0123456789'.indexOf(txt[txt.length - 1]) < 0) {
       this.warn(`Invalid number "${txt}" for ${name}`);
@@ -2489,7 +2489,7 @@ class Controller {
   }
 
   //
-  // Operations that affect the current diaFRAM model
+  // Operations that affect the current FRAMifier model
   //
   
   promptForNewModel() {
@@ -2504,7 +2504,7 @@ class Controller {
   createNewModel() {
     const md = this.modals.model;
     // Create a brand new model with (optionally) specified name and author
-    MODEL = new diaFRAMModel(
+    MODEL = new FRAMifierModel(
         md.element('name').value.trim(), md.element('author').value.trim());
     md.hide();
     this.updateTimeStep();
@@ -2681,7 +2681,7 @@ class Controller {
     // Save selection as XML in local storage of the browser.
     const xml = MODEL.selectionAsXML;
     if(xml) {
-      window.localStorage.setItem('diaFRAM-selection-XML', xml);
+      window.localStorage.setItem('FRAMifier-selection-XML', xml);
       this.updateButtons();
       const bn = (this.browser_name ? ` of ${this.browser_name}` : '');
       this.notify('Selection copied to local storage' + bn);
@@ -2691,14 +2691,14 @@ class Controller {
   get canPaste() {
     // Return TRUE if the browser has a recent selection-as-XML object
     // in its local storage.
-    const xml = window.localStorage.getItem('diaFRAM-selection-XML');
+    const xml = window.localStorage.getItem('FRAMifier-selection-XML');
     if(xml) {
       const timestamp = xml.match(/<copy timestamp="(\d+)"/);
       if(timestamp) { 
         if(Date.now() - parseInt(timestamp[1]) < 8*3600000) return true;
       }
       // Remove XML from local storage if older than 8 hours.
-      window.localStorage.removeItem('diaFRAM-selection-XML');
+      window.localStorage.removeItem('FRAMifier-selection-XML');
     }
     return false;
   }
@@ -2802,7 +2802,7 @@ class Controller {
     // If selection has been saved as XML in local storage, test to
     // see whether PASTE would result in name conflicts, and if so,
     // open the name conflict resolution window.
-    let xml = window.localStorage.getItem('diaFRAM-selection-XML');
+    let xml = window.localStorage.getItem('FRAMifier-selection-XML');
     try {
       xml = parseXML(xml);
     } catch(e) {
@@ -3098,7 +3098,7 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     if(rl === false) return false;
     model.name = md.element('name').value.trim();
     // Display model name in browser unless blank
-    document.title = model.name || 'diaFRAM';
+    document.title = model.name || 'FRAMifier';
     model.author = md.element('author').value.trim();
     // Some changes may necessitate redrawing the diagram.
     let cb = UI.boxChecked('settings-align-to-grid'),

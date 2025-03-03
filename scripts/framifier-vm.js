@@ -1,14 +1,14 @@
 /*
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
-This JavaScript file (diafram-vm.js) defines the classes and functions that
+This JavaScript file (framifier-vm.js) defines the classes and functions that
 implement the Virtual Machine that calculates arithmetical expressions for
-system aspects and activity states when a diaFRAM model is run.
+system aspects and activity states when a FRAMifier model is run.
 */
 /*
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1075,7 +1075,7 @@ class VirtualMachine {
       'year': 'yr', 'week': 'wk', 'day': 'd',
       'hour': 'h', 'minute': 'm', 'second': 's'
     };
-    // Standard 1-letter codes for diaFRAM entities.
+    // Standard 1-letter codes for FRAMifier entities.
     this.entity_names = {
       A: 'actor',
       F: 'activity',
@@ -1480,14 +1480,14 @@ class VirtualMachine {
 
 // Functions implementing Virtual Machine Instructions (hence prefix VMI)
 
-// diaFRAM features one type of virtual machine: a stack automaton for
+// FRAMifier features one type of virtual machine: a stack automaton for
 // calculation of arithmetical expressions
   
 // All Virtual Machine instructions (VMI) are 2-element arrays
 // [function, argument list]
 
 // STACK AUTOMATON INSTRUCTIONS
-// Properties of diaFRAM entities are either numbers (constant values)
+// Properties of FRAMifier entities are either numbers (constant values)
 // or expressions. To allow lazy evaluation of expressions, each expression
 // has its own stack automaton. This automaton computes the expression
 // result by consecutively executing the instructions in the expression's
