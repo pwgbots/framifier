@@ -2,10 +2,10 @@
 <html lang="en-US">
 <head id="doc-head">
   <meta http-equiv="content-type" content="text/html; charset=UTF-8">
-  <title>diaFRAM</title>
+  <title>FRAMifier</title>
 
 <!--
-diaFRAM is an executable graphical editor in support of the Functional
+FRAMifier is an executable graphical editor in support of the Functional
 Resonance Analysis Method developed originally by Erik Hollnagel.
 This tool is developed by Pieter Bots at Delft University of Technology.
 
@@ -13,12 +13,12 @@ This HTML document (index.html) provides the browser-based GUI for
 editing and executing FRAM models. See the <head> section for required
 JavaScript files.
 
-The diaFRAM model editor is implemented in JavaScript and will work
+The FRAMifier model editor is implemented in JavaScript and will work
 "stand-alone" in modern web browsers.
 -->
 
 <!--
-Copyright (c) 2024 Delft University of Technology
+Copyright (c) 2024-2025 Delft University of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -46,9 +46,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // Create global variables
     var
       // Version number
-      DIAFRAM_VERSION = '0.1.1',
+      FRAMIFIER_VERSION = '0.1.1',
       // GitHub repository
-      GITHUB_REPOSITORY = 'https://github.com/pwgbots/diafram',
+      GITHUB_REPOSITORY = 'https://github.com/pwgbots/framifier',
       // Create the XML parser
       XML_PARSER = new DOMParser(),
       // NOTE: global variables will be initialized when page has loaded
@@ -75,8 +75,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         };
       
       
-    function loadDiaFRAM() {
-      // Ensures that the diaFRAM HTML and scripts will be the latest
+    function loadFRAMifier() {
+      // Ensures that the FRAMifier HTML and scripts will be the latest
       // version by reloading unless URL contains current time stamp
       // truncated to 10 s
       const d = new Date(),
@@ -89,7 +89,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.type = 'text/css';
-        link.href = 'diafram.css?x=' + t;
+        link.href = 'framifier.css?x=' + t;
         link.media = 'all';
         document.getElementById('doc-head').appendChild(link);
         // Reload the scripts in their proper sequence, i.e., such that all
@@ -105,7 +105,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     function loadScripts(sl, t) {
       if(sl.length == 0) {
         // Initialize only after all scripts have loaded
-        initializeDiaFRAM();
+        initializeFRAMifier();
       } else {
         const
             s = sl.shift(),
@@ -113,17 +113,17 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             script = document.createElement('script');
         // NOTE: recursive call after script s has loaded
         script.onload = () => {
-            console.log('Loaded script: diafram' + s);
+            console.log('Loaded script: framifier' + s);
             loadScripts(sl, t);
           };
-        script.src= 'scripts/diafram' + s + '.js?x=' + t;
+        script.src= 'scripts/framifier' + s + '.js?x=' + t;
         head.appendChild(script);
       }
     }
     
-    function initializeDiaFRAM() {
+    function initializeFRAMifier() {
       // Protect user from unintentionally closing the browser.
-      window.onbeforeunload = () => { return 'Exit diaFRAM?'; };
+      window.onbeforeunload = () => { return 'Exit FRAMifier?'; };
       // NOTE: first create Controller and Documentation Manager to
       // report messages.
       UI = new Controller();
@@ -138,17 +138,17 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       FILE_MANAGER = new FileManager();
       // Initialize auto-saving function
       AUTO_SAVE = new ModelAutoSaver();
-      // Create a new diaFRAM model
+      // Create a new FRAMifier model
       UI.createNewModel();
     }
     
   </script>
 </head>
-<body onload="loadDiaFRAM();">
+<body onload="loadFRAMifier();">
   <!-- header shows top menu bar -->
   <header>
     <img id="static-icon" src="images/logo.png">
-    <div id="diafram-version-number"></div>
+    <div id="framifier-version-number"></div>
     <div id="topbar">
       <img id="new-btn" class="btn enab" src="images/new.png"
            title="Create new model">
@@ -299,7 +299,7 @@ and move the cursor over the status bar">
     </div>
   </div>
 
-  <!-- the LOAD dialog prompts the user for a diaFRAM model file on disk
+  <!-- the LOAD dialog prompts the user for a FRAMifier model file on disk
        to be loaded -->
   <div id="load-modal" class="modal">
     <div id="load-dlg" class="inp-dlg">
@@ -615,7 +615,7 @@ where X can be one or several of these letters: AFLS
     <div id="monitor-resize" class="resizer"></div>
   </div>
   
-  <!-- the DOCUMENTATION dialog shows user comments and diaFRAM docu-items -->
+  <!-- the DOCUMENTATION dialog shows user comments and FRAMifier docu-items -->
   <div id="documentation-dlg" class="inp-dlg">
     <div id="documentation-hdr" class="dragger dlg-title">
       <div id="docu-item-title">Documentation</div>

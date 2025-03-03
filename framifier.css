@@ -1,0 +1,1539 @@
+@font-face {
+  font-family: Lato;
+  src: url(fonts/Lato-Regular.ttf);
+}
+
+@font-face {
+  font-family: Lato;
+  src: url(fonts/Lato-Bold.ttf);
+  font-weight: bold;
+}
+
+@font-face {
+  font-family: Lato;
+  src: url(fonts/Lato-Italic.ttf);
+  font-style: italic;
+}
+
+@font-face {
+  font-family: Lato;
+  src: url(fonts/Lato-BoldItalic.ttf);
+  font-weight: bold;
+  font-style: italic;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  font-family: Lato, Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -khtml-user-select: none;
+  user-select: none;   
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+blockquote {
+  font-size: 10px;
+  margin-left: 9px;
+  padding-left: 3px;
+  border-left: solid 3px #bfc0e2;
+}
+
+header,
+footer {
+  flex: none;
+  background-color: #e0f0f8;
+}
+
+footer {
+  margin-left: 34px;
+}
+
+main {
+  margin-left: 34px;
+  overflow: scroll;
+  -webkit-overflow-scrolling: touch;
+  flex: auto;
+  border-top: 1px solid #e2d8e8;
+  background-color: #faf8f9;
+}
+
+td > img {
+  height: 16px;
+  margin-bottom: -2px;
+  margin-right: 3px;
+}
+
+#ccsa {
+  width: 100vw;
+  height: 80vh;
+}
+
+/* the chart container that holds the SVG paper in the main area */
+#cc {
+  min-width: 100vw;
+  min-height: 80vh;
+  background-color: #fdffff;
+}
+
+#static-icon {
+  position: absolute;
+  top: -1px;
+  left: 0px;
+  height: 30px;
+  width: auto;
+  margin: 3px;
+}
+
+#framifier-version-number {
+  position: absolute;
+  top: 24px;
+  left: 40px;
+  height: 8px;
+  padding: 2px;
+  font: 7px sans-serif;
+  font-style: oblique;
+  color: #202030;
+}
+
+#topbar {
+  display: inline-block;
+  margin-left: 225px;
+  margin-top: 1px;
+  margin-botto: 3px;
+}
+
+#host-logo {
+  height: 25px;
+  margin: 3px;
+}
+
+#info-line {
+  width: 100%;
+  font-size: 13px;
+  padding: 4px;
+}
+
+#info-line.error {
+  background: Orange;
+  font-weight: bold;
+  color: black;
+}
+
+#info-line.warning {
+  background: Yellow;
+  color: black;
+}
+
+#info-line.notification {
+  background: SkyBlue;
+  color: black;
+}
+
+/* the horizontal status bar at the bottom of the browser window */
+#statusbar {
+  border: 1px solid #e2d8e8;
+  border-collapse: collapse;
+}
+
+#pos-x,
+#pos-y {
+  min-width: 51px;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#zoom {
+  min-width: 32px;
+  text-align: center;
+}
+
+#step {
+  min-width: 32px;
+  text-align: center;
+}
+
+#clock-time {
+  width: 72px;
+  padding-right: 3px;
+  padding-left: 3px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#pos-y,
+#zoom-sep,
+#step-sep,
+#clock-time,
+#info-line,
+#issue-panel,
+#autosave-sep {
+  border-right: 1px solid #e2d8e8;
+}
+
+#info-line {
+  width: 100%;
+}
+
+span.extra {
+  color: gray;
+  font-style: italic;
+  margin-left: 10px;
+}
+
+#recall-btn {
+  min-width: 14px;
+  background-image: url(images/info.png);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+#recall-btn:hover {
+  filter: brightness(1.3);
+}
+
+#set-up-progress {
+  width: 100%;
+  height: 1.5px;
+  background-color: #e8e8e8;
+}
+
+#set-up-progress-bar {
+  height: 100%;
+  width: 0%;
+  background-color: #500080;
+}
+
+div.error-time,
+div.warning-time,
+div.notification-time {
+  display: inline-block;
+  font: 9px monospace;
+  width: 50px;
+  vertical-align: top;
+  padding-top: 4px;
+}
+
+div.error-time {
+  color: red;
+}
+
+div.warning-time {
+  color: orange;
+}
+
+div.notification-time {
+  color: #0040f0;
+}
+
+div.error-msg,
+div.warning-msg,
+div.notification-msg {
+  display: inline-block;
+  max-width: calc(100% - 65px);  
+}
+
+div.error-msg {
+  color: #c00000;
+}
+
+div.warning-msg {
+  color: #806040;
+}
+
+div.notification-msg {
+  color: #0060a0;
+}
+
+a.enab {
+  text-decoration: none;
+}
+
+a.disab {
+  pointer-events: none;
+  text-decoration: none;
+}
+
+img.btn {
+  width: 26px;
+  height: 26px;
+  margin: 4px;
+  border-radius: 4.5px;
+  vertical-align: middle;
+}
+
+img.sep {
+  margin-bottom: 10px;
+}
+
+img.enab {
+  cursor: pointer;
+}
+
+img.enab:hover {
+  background-color: #a0c0d0;
+}
+
+img.disab {
+  filter: grayscale(100%) brightness(150%) contrast(60%);
+  pointer-events: none;
+}
+
+img.activ {
+  background-color: #a880b8;
+}
+
+img.stay-activ {
+  background-color: #f09090;
+}
+
+img.off {
+  display: none !important;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+img.blink {
+  animation: blink 1s step-start 0s infinite;
+}
+
+#stop-btn.blink {
+  cursor: default;
+  pointer-events: none;
+}
+
+img.mbtn {
+  width: 21px;
+  height: 21px;
+  margin: 1px 2px;
+  border-radius: 2px;
+  vertical-align: top;
+}
+
+img.sbtn {
+  width: 16px;
+  height: 16px;
+  margin: 1px 2px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+img.sbtn.senab:hover {
+  filter: brightness(150%);
+}
+
+img.sgray {
+  width: 16px;
+  height: 16px;
+  margin: -1px;
+  vertical-align: middle;
+  filter: grayscale(100%);
+}
+
+
+input {
+  vertical-align: baseline;
+}
+
+input[type="text"],
+input[type="password"] {
+  height: 17px !important; 
+  /* prevent overrun in Safari */
+  border-width: thin !important;
+  padding: 0;
+  border-radius: 0;
+  font-size: 13px;
+}
+
+input[type="text"]:disabled {
+    background-color: #f4ffff;
+}
+
+textarea {
+  /* prevent overrun in Safari */
+  box-sizing: border-box !important;
+  resize: none;
+}
+
+/* the vertical side bar with editing buttons on the left-hand side of the browser window */ 
+#sidebar {
+  position: fixed;
+  top: 35px;
+  left: 0;
+  width: 34px;
+  height: inherit;
+  padding-top: 10px;
+  background-color: #e0f0f8;
+  border-right: 1px solid #e2d8e8;
+}
+
+#issue-panel {
+  display: none;
+  background-color: Yellow;
+  white-space: nowrap;
+  padding: 0 3px;
+}
+
+#issue-nr {
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+#prev-issue,
+#next-issue {
+  cursor: pointer;
+}
+
+#prev-issue:hover,
+#issue-nr:hover,
+#next-issue:hover {
+  color: Orange;
+}
+
+#prev-issue.disab,
+#next-issue.disab {
+  cursor: default;
+  pointer-events: none;
+  color: #e8d898;
+}
+
+/* Modal dialogs cover the entire browser window with a dark,
+   semi-transparent DIV that ignores mouse events. Their z-index
+   is 100+ so that they cover "stay-on-top" dialogs. */ 
+div.modal {
+  display: none;
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* on top of the "modal layer", modal dialogs appear in the center of
+   the browser window */
+div.inp-dlg {
+  position: absolute; 
+  top: 0; 
+  bottom: 0; 
+  left: 0; 
+  right: 0;
+  margin: auto;
+  border-radius: 4px;
+  border: 1px solid #002080;
+  box-shadow: 0 0 3px rgb(0, 0, 0, 0.5);
+  background-color: #f4f8ff;
+  font-size: 12px;
+}
+
+div.dlg-title {
+  background-color: #a0d0e0;  
+  border-radius: 3.3px 3.3px 0pt 0pt;
+  padding: 3px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* all input dialogs have an OK button and a CANCEL button,
+   stay-on-top dialogs have a CLOSE button */
+img.ok-btn,
+img.cancel-btn,
+img.close-btn,
+img.info-btn {
+  width: 17px;
+  height: 17px;
+  margin-left: 4px;
+  margin-top: -1px;
+  float: right;
+  cursor: pointer;
+}
+
+/* To appear responsive to cursor, buttons change brightness */
+img.ok-btn:hover,
+img.inline-ok-btn:hover,
+img.close-btn:hover,
+img.info-btn:hover {
+  filter: brightness(130%);
+}
+
+img.cancel-btn,
+img.inline-cancel-btn {
+  filter: brightness(85%);
+}
+
+img.cancel-btn:hover,
+img.inline-cancel-btn:hover {
+  filter: brightness(120%);
+}
+
+/* CHECK BOX styles
+   NOTE: separate style names `abox` and `vbox` so that different events can be
+   bound dynamically to actor check boxes */
+div.box,
+div.abox,
+div.vbox {
+  display: inline-block;
+  filter: brightness(95%);  
+  width: 17px;
+  height: 17px;
+  margin: 2px;
+  margin-bottom: 0px;
+  cursor: pointer;
+}
+
+div.box:hover,
+div.abox:hover,
+div.vbox:hover {
+  filter: brightness(105%);  
+}
+
+div.clear {
+  background-size: contain;
+  background-image: url('images/check-off.png');
+}
+
+div.checked {
+  background-size: contain;
+  background-image: url('images/check-on.png');
+}
+
+div.crossed {
+  background-size: contain;
+  background-image: url('images/check-x.png');
+}
+
+div.disab {
+  background-size: contain;
+  background-image: url('images/check-disab.png');
+}
+
+/* NOTE: the name of the focal activity is displayed to the right of
+         the top bar buttons */
+#focal-activity {
+  display: inline-block;
+  margin-left: 50px;
+  max-height: 32px;
+  border-left: solid 1px silver;
+}
+
+#focal-name {
+  font: 10pt sans-serif;
+  display: inline-block;
+  max-width: calc(100vw - 735px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 4px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+#focal-name::before {
+  content: '\25B6 ';
+  color: #0000c0;
+}
+
+#load-autosaved-btn {
+  position: absolute;
+  right: 2px;
+  top: 23px;
+  height: 20px;
+  width: 20px;
+  display: none;
+}
+
+#autosave-btn {
+  height: 15px;
+  width: 15px;
+}
+
+#restore-dlg {
+  width: 440px;
+  max-height: 219px;
+}
+
+#restore-scroll-area {
+  position: absolute;
+  top: 24px;
+  left: 2px;
+  width: calc(100% - 4px);
+  max-height: 190px;
+  overflow-x: clip;
+  overflow-y: auto;
+  border-top: 1px solid Silver;
+}
+
+td.restore-name {
+  color: navy;
+  padding-right: 4px;
+  max-width: 272px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+td.p-name {
+  padding-right: 4px;
+  max-width: 272px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+tr.list {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+tr.list:hover {
+  background-color: #a0c0d0;
+}
+
+tr.sel-set {
+  background-color: #bfefff;
+  font-weight: bold; 
+}
+
+tr.dataset,
+tr.variable {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+tr.dataset:hover,
+tr.variable:hover {
+  background-color: #a0c0d0;
+}
+
+tr.def-sel {
+  color: #400090;
+  font-weight: bold;
+}
+
+tr.dataset > td > div {
+  display: inline-block;
+}
+
+div.ds-indent {
+  color: #909090;
+  text-align: right;
+  font-weight: normal !important;
+  margin-right: 2px;
+  margin-left: 3px;
+}
+
+div.tree-btn {
+  color: #909090;
+  margin-right: 3px;
+  cursor: pointer;
+  margin-left: -13px;
+}
+
+/* NOTE: The following dialogs are not modal, but "stay-on-top",
+         i.e., windows that remain open (until dismissed) and above
+         the main window, and they are draggable and resizable.
+         The z-indices are lower (5-50) than those of modal dialogs. */
+
+/* all resizable dialogs have a striped triangle at the bottom right */
+div.resizer {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  height: 12px;
+  width: 12px;
+  cursor: se-resize;
+  background-image: url(images/resize.png);
+  background-size: contain;
+}
+
+/* draggable dialogs can be moved by dragging their header */
+div.dragger {
+  cursor: move;
+}
+
+/* styles for the MODEL dialog */
+#model-dlg {
+  width: 270px;
+  height: 70px;
+}
+
+/* styles for the ADD Activity dialog */
+#add-activity-dlg {
+  width: 270px;
+  height: 70px;
+}
+
+/* styles for the ADD Aspect dialog */
+#add-aspect-dlg {
+  width: 314px;
+  height: 46px;
+}
+
+#add-aspect-from {
+  display: inline-block;
+  font-weight: normal;
+  vertical-align: bottom;
+  max-width: 138px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#add-aspect-name-lbl {
+  position: absolute;
+  top: 26px;
+  left: 3px;
+}
+
+#add-aspect-name {
+  position: absolute;
+  top: 24px;
+  left: 41px;
+  width: 248px;
+}
+
+/* styles for the ASPECT dialog */
+#aspect-dlg {
+  width: 276px;
+  height: 46px;
+}
+
+#aspect-lbl {
+  display: inline-block;
+  font-weight: normal;
+  vertical-align: bottom;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#aspect-name {
+  position: absolute;
+  top: 24px;
+  left: 2px;
+  width: 240px;
+}
+
+#aspect-x-btn {
+  position: absolute;
+  top: 23px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+}
+
+/* LOAD modal dialog */
+#load-dlg {
+  width: 430px;
+  height: min-content;
+  overflow: hidden;
+}
+
+#load-xml-file {
+  padding: 2px;
+  max-width: 375px;
+  overflow: hidden;
+}
+
+#load-autosaved-btn {
+  position: absolute;
+  right: 2px;
+  top: 23px;
+  height: 20px;
+  width: 20px;
+  display: none;
+}
+
+#autosave-btn {
+  height: 15px;
+  width: 15px;
+}
+
+#restore-dlg {
+  width: 440px;
+  max-height: 219px;
+}
+
+#restore-scroll-area {
+  position: absolute;
+  top: 24px;
+  left: 2px;
+  width: calc(100% - 4px);
+  max-height: 190px;
+  overflow-x: clip;
+  overflow-y: auto;
+  border-top: 1px solid Silver;
+}
+
+td.restore-name {
+  color: navy;
+  padding-right: 4px;
+  max-width: 272px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+img.del-asm-btn {
+  height: 12px;
+  width: 12px;
+  border-radius: 2px;
+  margin-bottom: -2px;
+  margin-right: 1px;
+  cursor: pointer;
+}
+
+img.del-asm-btn:hover {
+  background-color: #bfc0e2;
+}
+
+#auto-save-settings {
+  position: absolute;
+  bottom: 3px;
+  left: 2px;
+  width: calc(100% - 4px);
+}
+
+#auto-save-minutes,
+#auto-save-hours {
+  width: 25px;
+  text-align: center;
+  max-height: 17px;
+}
+
+#auto-save-clear-btn {
+  position: absolute;
+  right: 0px;
+  bottom: -4px;
+  width: 20px;
+  height: 20px;
+}
+
+#confirm-remove-models {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  height: 15px;
+  width: calc(100% - 8px);
+  background-color: #cc88b0;
+  padding: 1px 2px 3px 2px;
+}
+
+img.inline-ok-btn,
+img.inline-cancel-btn {
+  width: 17px;
+  height: 17px;
+  margin-bottom: -4px;
+  margin-left: 8px;
+  margin-right: 2px;
+  cursor: pointer;
+}
+
+/* ACTORS dialog */
+#actors-dlg {
+  width: 230px;
+  height: min-content;
+}
+
+#actors-scroll-area {
+  width: calc(100% - 5px);
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid Silver;
+  margin: 2px;
+}
+
+#actors-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#actors-table > tbody > tr {
+  height: 19px;
+  cursor: pointer;
+}
+
+#actors-table > tbody > tr:first-child {
+  background-color: #e0e0f4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+#actors-table > tbody > tr > td:last-child {
+  width: 37px;
+  text-align: right;
+  padding-right: 4px;}
+
+#actors-table > tbody > tr > td:nth-child(2) {
+  width: 19px;
+}
+
+#actors-table > tbody > tr > td:first-child {
+  max-width: calc(100% - 56px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#actors-table > tbody > tr > td > div {
+  height: 15px;
+  width: 15px;
+  margin: 1px;
+  border: 1px solid silver;
+}
+
+/* ACTOR dialog */
+#actor-dlg {
+  width: 200px;
+  height: 70px;
+}
+
+#actor-name-lbl {
+  position: absolute;
+  top: 25px;
+  left: 2px;
+}
+
+#actor-name {
+  position: absolute;
+  top: 23px;
+  left: 40px;
+}
+
+#actor-color-lbl {
+  position: absolute;
+  top: 46px;
+  left: 2px;
+}
+
+#actor-color {
+  position: absolute;
+  width: 24px;
+  height: 22px;
+  top: 45px;
+  left: 40px;
+}
+
+/* the DOCUMENTATION DIALOG displays comments and Linny-R reference */
+#documentation-dlg {
+  display: none;
+  z-index: 150; /* should be highest of all dialogs (even modal ones) */
+  margin: 0;
+  width: 520px;
+  height: 250px;
+  min-width: 520px;
+  min-height: 200px;
+  max-height: 99vh;
+  max-width: 99vw;
+  opacity: 0.9;
+}
+
+#docu-item-title {
+  display: inline-block;
+  max-width: calc(100% - 22px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#docu-container {
+  margin: 2px;
+  width: calc(100% - 4px);
+  height: calc(100% - 45px);
+}
+
+#docu-viewer {
+  height: calc(100% - 15px);
+  overflow-y: auto;
+  font-family: serif;
+  font-size: 9pt;
+  background-color: rgba(245, 251, 254, 0.5);
+  user-select: text;
+}
+
+#docu-viewer > p {
+  margin-top: 1px;
+  margin-bottom: 5px;
+}
+
+#docu-editor {
+  display: none;
+  height: 100%;
+  width: 100%;
+}
+
+#docu-edit-btn {
+  position: absolute;
+  left: 1px;
+  bottom: -1px;
+  width: 15px;
+  height: 15px;
+}
+
+#docu-model-info-btn {
+  position: absolute;
+  left: 25px;
+  bottom: -1px;
+  width: 15px;
+  height: 15px;
+}
+
+#docu-copy-btn {
+  position: absolute;
+  left: 45px;
+  bottom: -1px;
+  width: 15px;
+  height: 15px;
+}
+
+#docu-save-btn {
+  position: absolute;
+  left: 1px;
+  bottom: 1px;
+  width: 15px;
+  height: 15px;
+  display: none;
+}
+
+#docu-cancel-btn {
+  position: absolute;
+  left: 20px;
+  bottom: 1px;
+  width: 15px;
+  height: 15px;
+  filter: brightness(85%);
+  display: none;
+}
+
+#docu-info-btn {
+  position: absolute;
+  left: 40px;
+  bottom: 0.5px;
+  width: 16.5px;
+  height: 16.5px;
+  display: none;
+}
+
+#docu-resume-btn {
+  position: absolute;
+  left: 2px;
+  bottom: 1px;
+  width: 15px;
+  height: 15px;
+  display: none;
+}
+
+#docu-message-hint {
+  font-size: 10px;
+  font-style: italic;
+  position: absolute;
+  right: 20px;
+  bottom: 3px;
+}
+
+/* styles for the NOTE dialog */
+#note-dlg {
+  width: 320px;
+  height: 200px;
+}
+
+#note-text {
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+  margin: 2px;
+}
+
+#note-attr {
+  width: calc(100% - 4px);
+  height: 20px;
+  margin: 2px;
+}
+
+#note-color {
+  width: calc(100% - 61px);
+  font-size: 13px;
+}
+
+/* styles for the EXPRESSION EDITOR */
+#expression-modal {
+  z-index: 115;
+}
+
+#expression-dlg {
+  width: 565px;
+  height: 310px;
+}
+
+#expression-scope {
+  display: inline-block;
+  vertical-align: top;
+  margin-left: 10px;
+  max-width: calc(100% - 185px);
+  font-weight: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;  
+}
+
+#expression-text {
+  position: absolute;
+  top: 45px;
+  left: 2px;  width: calc(100% - 4.5px);
+  height: calc(100% - 72px);
+  font: 12px monospace;
+  overflow-y: hidden;
+}
+
+#expression-aspect-div {
+  position: absolute;
+  top: 24px;
+  left: 2px;
+  width: calc(100% - 4px);
+}
+
+#expression-aspect {
+  width: calc(100% - 40px);
+}
+
+#expression-incoming-div {
+  position: absolute;
+  top: 26px;
+  left: 2px;
+  font-style: italic;
+}
+
+#expression-incoming-aspect {
+  font-style: normal;
+}
+
+#expression-activity {
+  font-style: normal;
+  font-family: monospace;
+}
+
+#add-aspect-list,
+#sub-activities-from,
+#sub-activities-to,
+#expression-variables {
+  position: absolute;
+  left: calc(100% - 20px);
+  bottom: 2px;
+  min-width: 60px;
+  max-width: 190px;
+  font-size: 12px;
+  background-color: #d8f0f8;
+  border: 2px solid #c0e0f8;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+#add-aspect-list > table,
+#expression-variables > table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#sub-activities-from-table,
+#sub-activities-to-table {
+  width: 100%;
+  pointer-events: all;
+}
+
+#sub-activities-from-table > tbody > tr > td,
+#sub-activities-to-table > tbody > tr > td,
+#add-aspect-list > table > tbody > tr > td,
+#expression-variables > table > tbody > tr > td {
+  height: 16px;
+}
+
+#sub-activities-modal {
+  background-color: rgba(0, 64, 128, 0.05) !important;
+}
+
+#sub-activities-list {
+  position: absolute;
+}
+
+#sub-activities-from,
+#sub-activities-to {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  display: inline-block;
+  max-height: 120px;
+  overflow: scroll;
+}
+
+#sub-activities-from-lbl,
+#sub-activities-to-lbl {
+  font-weight: bold;
+}
+
+#add-aspect-insert,
+#expression-insert {
+  position: absolute;
+  right: 1px;
+  bottom: 3px;
+}
+
+#expression-status {
+  position: absolute;
+  border: solid 1px #e2d8e8;
+  bottom: 0;
+  width: calc(100% - 30px);
+  margin: 2px;
+  padding: 2px;
+}
+
+#expression-help {
+  display: none;
+  position: absolute;
+  border: solid 1px #e2d8e8;
+  background-color: #fafcfe;
+  border-radius: 4px;
+  top: 22px;
+  left: 2px;
+  width: calc(100% - 9px);
+  height: calc(100% - 29px);
+  padding: 2px;
+  font-family: Serif;
+  font-size: 13px;
+}
+
+#expression-help h3 {
+  margin: 0;
+}
+
+#expression-help h4 {
+  margin: 6px 0px 3px 0px;
+}
+
+#expression-help p {
+  margin: 0px 0px 3px 0px;
+}
+
+#expression-help code {
+  margin: 0px 2px 0px 2px;
+}
+
+#diagram-menu {
+  display: none;
+  position: fixed;
+  left: 380px;
+  top: 40px;
+  border: solid 1px #e2d8e8;
+  background-color: #f2f0f4;
+}
+
+div.menu-item {
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+div.menu-item:hover {
+  background-color: #bfc0e2;  
+}
+
+/* styles for the MODEL SETTINGS dialog */
+#settings-dlg {
+  width: min-content;
+  height: min-content;
+}
+
+/* the MOVE modal asks whether node should be moved to focal cluster */
+#move-dlg {
+  width: 270px;
+  height: 120px;
+}
+
+#move-msg {
+  width: calc(100% - 8px);
+  height: calc(100% - 55px);
+  margin: 3px;
+  overflow: auto;
+}
+
+#move-activity-name,
+#move-from-parent,
+#move-to-parent {
+  white-space: nowrap;
+}
+
+#move-buttons {
+  width: 100%;
+  height: 23px;
+  padding-top: 3px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+#move-buttons > img {
+  float: none;
+  height: 23px;
+  width: 23px;
+  vertical-align: middle;
+  padding-bottom: 3px;
+}
+
+
+
+/* the FINDER DIALOG allows lookup of occurrences of entities */
+#finder-dlg {
+  display: none;
+  z-index: 40;
+  margin: 0;
+  width: 450px;
+  height: 335px;
+  min-width: 400px;
+  min-height: 200px;
+  max-height: 99vh;
+  max-width: 99vw;
+  opacity: 0.9;
+}
+
+#finder-entity-imgs {
+  display: inline-block;
+}
+
+#finder-entity-imgs > img {
+  height: 14px;
+  width: 14px;
+  margin-left: 3px;
+  margin-bottom: -2px;
+}
+
+#finder-filter-bar {
+  position: absolute;
+  top: 23px;
+  left: 2px;
+  width: calc(50% - 4px);
+}
+
+#finder-filter-text {
+  max-height: 16px;
+  width: calc(100% - 1px);
+  font-size: 12px;
+}
+
+#finder-scroll-area {
+  position: absolute;
+  top: 43px;
+  left: 2px;
+  width: calc(50% - 4px);
+  height: calc(100% - 62px);
+  overflow-y: auto;
+  border-top: 1px solid Silver;
+}
+
+#finder-table {
+  width: 100%;
+}
+
+img.finder {
+  height: 14px;
+  width: 14px;
+  margin-right: 2px;
+  margin-bottom: -2px;
+}
+
+#finder-status {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  width: 50%;
+}
+
+#finder-separator {
+  position: absolute;
+  top: 22px;
+  left: calc(50%);
+  height: calc(100% - 24px);
+  width: 3px;
+  border-left: 1.5px Silver ridge;
+}
+
+#finder-item-header {
+  position: absolute;
+  top: 23px;
+  left: calc(50% + 4px);
+  width: calc(50% - 6px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#finder-item-scroll-area {
+  position: absolute;
+  top: 43px;
+  left: calc(50% + 4px);
+  width: calc(50% - 6px);
+  height: calc(50% - 20px);
+  overflow-y: auto;
+  border-top: 1px solid Silver;
+}
+
+#finder-expression-hdr {
+  position: absolute;
+  top: calc(50% + 23px);  
+  left: calc(50% + 4px);
+}
+
+#finder-expression-scroll-area {
+  position: absolute;
+  top: calc(50% + 38px);
+  left: calc(50% + 4px);
+  width: calc(50% - 6px);
+  height: calc(50% - 48px);
+  overflow-y: auto;
+  border-top: 1px solid Silver;
+}
+
+
+/* the MONITOR DIALOG displays solver progress and messages */
+#monitor-dlg {
+  display: none;
+  z-index: 35;
+  margin: 0;
+  width: 680px;
+  height: 250px;
+  min-width: 250px;
+  min-height: 150px;
+  max-height: 99vh;
+  max-width: 99vw;
+}
+
+#monitor-clear-btn {
+  color: #603000;
+  background-color: white;
+  border: 1px solid #603000;
+  box-shadow: inset #ffd0b0 0 0 8px 2px; 
+}
+  
+#monitor-clear-btn:hover {
+  box-shadow: inset #f0c0a0 0 0 11px 2px; 
+}
+
+#monitor-msg {
+  margin: 2px;
+  padding-top: 3px;
+  width: calc(100% - 5px);
+  height: calc(100% - 45px);
+  font: 12px monospace;
+  border: 1px solid Black;
+}
+
+#monitor-ticks {
+  position: absolute;
+  bottom: 4px;
+  left: 2px;
+}
+
+#monitor-timer {
+  position: absolute;
+  bottom: 4px;
+  right: 20px;
+  min-width: 43px;
+  text-align: right;
+}
+
+#monitor-progress {
+  position: absolute;
+  bottom: 4px;
+  left: 110px;
+  height: 10px;
+  border: 1px solid #dadada;
+  border-radius: 5px;
+  width: calc(100% - 140px);
+}
+
+#monitor-progress-bar {
+  height: 100%;
+  width: 0%;
+  box-shadow: inset 0 0 5px 0px #006000;
+  border-radius: 5px;
+}
+
+div.progress-block {
+  background-color: rgba(0, 224, 0, 0.55);
+  height: 9px;
+  display: inline-block;
+  vertical-align: top;
+  margin-top: 0.5px;
+  cursor: pointer;
+}
+
+div.progress-block:hover {
+  box-shadow: inset 0 0 0 1.8px #404040;
+}
+
+div.progress-block:first-child {
+  border-radius: 5px 0 0 5px;
+}
+
+div.progress-block:last-child {
+  border-radius: 0 5px 5px 0;
+}
+
+div.progress-block:first-child:last-child {
+  border-radius: 5px;
+}
+
+div.even-pb {
+  filter: brightness(120%);
+}
+
+div.sel-pb {
+  filter: saturate(15%) brightness(50%) contrast(150%);
+}
+
+div.error-pb {
+  background-color: rgba(210, 0, 0, 0.7);
+  min-width: 1%;
+}
+
+#call-stack-dlg {
+  width: 320px;
+  height: 250px;
+}
+
+#call-stack-error {
+  display: inline-block;
+}
+
+#call-stack-table {
+  width: calc(100% - 9px);
+  height: calc(100% - 26px);
+  margin: 2px;
+  padding-left: 4px;
+  border: solid 1px Silver;
+  background-color: White;
+  overflow: auto;
+}
+
+div.call-stack-vbl {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+div.call-stack-expr {
+  font-family: monospace;
+  font-size: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;  
+}
+
