@@ -178,6 +178,7 @@ class Controller {
     this.add_y = 0;
     this.on_node = null;
     this.on_link = null;
+    this.on_deep_link = null;
     this.on_aspect = null;
     this.on_activity = null;
     this.on_note = null;
@@ -187,6 +188,7 @@ class Controller {
     this.dbl_clicked_activity = null;
     this.target_activity = null;
     this.link_under_cursor = null;
+    this.deep_link_under_cursor = null;
     this.deep_link_info = '';
     this.from_connector = null;
     this.from_activity = null;
@@ -250,6 +252,13 @@ class Controller {
       this.modals[main_modals[i]] = new ModalDialog(main_modals[i]);
     }
     
+    // Create deep link menu.
+    this.deep_link_menu = document.getElementById('deep-link-modal');
+    this.deep_link_menu.style.display = 'none';
+    // Menu disappears when cursor moves out.
+    this.deep_link_menu.firstElementChild.addEventListener(
+        'mouseout', () => this.hideDeepLinkMenu());
+    
     // Initially, no dialog being dragged or resized.
     this.dr_dialog = null;
     
@@ -259,7 +268,7 @@ class Controller {
     // Record of message that was overridden by more important message.
     this.old_info_line = null;
   }
-
+  
   pointInViewport(rx, ry) {
     // Return paper coordinates of the cursor position if the cursor were
     // located at relative position (rx * window width, ry * window height)
@@ -825,6 +834,7 @@ class Controller {
   setLinkUnderCursor(l) {
     // Set link under cursor (if any).
     this.link_under_cursor = l;
+    this.deep_link_under_cursor = null;
     this.deep_link_info = '';
   }
   
@@ -836,10 +846,64 @@ class Controller {
     for(let i = 0; i < n; i++) {
       html.push(l.deep_links[i].displayName);
     }
+    this.deep_link_under_cursor = l;
     this.deep_link_info = l.displayName +
         ` <em>represents ${n} links:</em> ${html.join(', ')}`;
   }
   
+  showDeepLinkMenu() {
+    const l = this.deep_link_under_cursor;
+    if(l) {
+      const n = l.deep_links.length;
+      if(n) {
+        const
+            dlt = this.deep_link_menu.firstElementChild,
+            html = [];
+        for(let i = 0; i < n; i++) {
+          html.push(`<tr class="list"><td onclick="UI.selectDeepLink(${i})">`,
+              l.deep_links[i].displayName, '</td><td><img class="sbtn sblue" ',
+              'src="images/delete.png" title="Delete this link" ',
+              `onclick="UI.deleteDeepLink(${i})"></td></tr>`);
+        }
+        dlt.innerHTML = '<table>' + html.join('') + '</table>';
+        // Position the pop-up list.
+        const lh = 19 * n;
+        dlt.style.top = Math.max(this.page_y - lh / 2, 45) + 'px';
+        dlt.style.left = (this.page_x - 20) + 'px';
+        dlt.style.height = 'min-content';
+        this.deep_link_menu.style.display = 'block';
+      }
+    }
+  }
+  
+  selectDeepLink(n) {
+    this.deep_link_menu.style.display = 'none';
+    const l = this.deep_link_under_cursor;
+    if(l && n < l.deep_links.length) {
+      this.showAddAspectDialog(l.deep_links[n]);
+    }
+  }
+  
+  deleteDeepLink(n) {
+    this.deep_link_menu.style.display = 'none';
+    const l = this.deep_link_under_cursor;
+    if(l && n < l.deep_links.length) {
+      MODEL.clearSelection();
+      MODEL.selection.push(l.deep_links[n]);
+      UNDO_STACK.push('delete');
+      MODEL.deleteSelection();
+      UI.updateButtons();
+    }
+  }
+  
+  hideDeepLinkMenu() {
+    const e = event || window.event;
+    e.preventDefault();
+    e.stopPropagation();
+    // Only hide when the mouse leaves the complete list.
+    if(e.target.nodeName === 'DIV') this.deep_link_menu.style.display = 'none';    
+  }
+
   setAspectUnderCursor(event) {
     // Sets aspect under cursor (if any).
     let t = event.target;
@@ -895,6 +959,15 @@ class Controller {
   }
   
   makeFocalActivity(a) {
+    // NOTE: Activities having connections cannot become focal.
+    const
+        io = a.countLinksInOut,
+        nc = io.incoming + io.outgoing;
+    if(nc) {
+      UI.notify(a.displayName + ' itself has ' + pluralS(nc, 'connection') +
+          ' and hence cannot have sub-functions');
+      return;
+    }
     const fa = MODEL.focal_activity;
     MODEL.focal_activity = a;
     MODEL.clearSelection(false);
@@ -993,6 +1066,7 @@ class Controller {
     this.on_node = null;
     this.on_activity = null;
     this.on_link = null;
+    this.on_deep_link = null;
     this.on_aspect = null;
     this.on_note = null;
     this.dragged_node = null;
@@ -1337,6 +1411,7 @@ class Controller {
               `<code style="color: gray"> &#x225C; ${ix.text}</code>`;
         });
     }
+
     function connectorMouseOver() {
       // Do not respond when connecting from the same activity, or when
       // trying to connect to an output.
@@ -1733,6 +1808,7 @@ class Controller {
     this.on_activity = null;
     this.on_aspect = null;
     this.on_link = null;
+    this.on_deep_link = null;
   }
 
   mouseMove(e) {
@@ -1766,6 +1842,8 @@ class Controller {
       this.on_aspect_link = this.aspect_link_under_cursor;
     } else if(fa.relatedLinks.indexOf(this.link_under_cursor) >= 0) {
       this.on_link = this.link_under_cursor;
+    } else if(this.deep_link_under_cursor) {
+      this.on_deep_link = this.deep_link_under_cursor;
     }
     for(let i = fa.notes.length-1; i >= 0; i--) {
       const n = fa.notes[i];
@@ -1913,6 +1991,8 @@ class Controller {
         this.showNotePropertiesDialog(this.on_note);
       }
     // NOTE: First check links -- see mouseMove() for motivation.
+    } else if(this.on_deep_link) {
+      this.showDeepLinkMenu();
     } else if(this.on_link) {
       MODEL.select(this.on_link);
     } else if(this.on_aspect) {
@@ -1935,7 +2015,7 @@ class Controller {
       }
       // Pass dragged activity for UNDO.
       UNDO_STACK.push('move', this.dragged_node, true);
-    } else { 
+    } else {
       MODEL.deselectAspect();
       this.dragged_node = null;
       this.start_sel_x = this.mouse_x;
@@ -3273,6 +3353,10 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     this.edited_object = a;
     const c = (l ? l.to_connector : '');
     X_EDIT.editExpression(a, c);
+  }
+  
+  showLinkPropertiesDialog(l) {
+    this.notify('Link properties dialog not implemented -- work in progress...');
   }
   
 } // END of class Controller

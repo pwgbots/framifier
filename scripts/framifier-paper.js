@@ -887,7 +887,8 @@ class Paper {
     // NOTE: Clear this global, as Bezier curves move from under the cursor.
     // without a mouseout event.
     this.link_under_cursor = null;
-        // Draw the selected entities and associated links.
+    this.deep_link_under_cursor = null;
+    // Draw the selected entities and associated links.
     for(let i = 0; i < mdl.selection.length; i++) {
       const obj = mdl.selection[i];
       // Links are drawn separately, so do not draw those contained in

@@ -337,6 +337,18 @@ img.sbtn.senab:hover {
   filter: brightness(150%);
 }
 
+img.sblue {
+  filter: hue-rotate(245deg) brightness(450%);
+}
+
+img.sbtn.sblue {
+  filter: hue-rotate(245deg) brightness(450%);
+}
+
+img.sbtn.sblue:hover {
+  filter: none;
+}
+
 img.sgray {
   width: 16px;
   height: 16px;
@@ -1125,6 +1137,7 @@ img.inline-cancel-btn {
   font-family: monospace;
 }
 
+#deep-link-menu,
 #add-aspect-list,
 #sub-activities-from,
 #sub-activities-to,
@@ -1141,6 +1154,7 @@ img.inline-cancel-btn {
   border-radius: 3px;
 }
 
+#deep-link-menu > table,
 #add-aspect-list > table,
 #expression-variables > table {
   width: 100%;
@@ -1155,6 +1169,7 @@ img.inline-cancel-btn {
 
 #sub-activities-from-table > tbody > tr > td,
 #sub-activities-to-table > tbody > tr > td,
+#deep-link-menu > table > tbody > tr > td,
 #add-aspect-list > table > tbody > tr > td,
 #expression-variables > table > tbody > tr > td {
   height: 16px;
