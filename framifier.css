@@ -940,7 +940,7 @@ img.inline-cancel-btn {
   left: 40px;
 }
 
-/* the DOCUMENTATION DIALOG displays comments and Linny-R reference */
+/* the DOCUMENTATION DIALOG displays comments and FRAMifier reference */
 #documentation-dlg {
   display: none;
   z-index: 150; /* should be highest of all dialogs (even modal ones) */
@@ -1417,6 +1417,38 @@ img.finder {
   border-top: 1px solid Silver;
 }
 
+/* the UPDATE DIALOG notifies that a new version has been released */
+#update-dlg {
+  width: 250px;
+  height: 85px;  
+}
+
+#update-version {
+  position: absolute;
+  top: 32px;
+  left: 122px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #00008b;
+}
+
+#update-release {
+  position: absolute;
+  top: 50px;
+  left: 44px;
+  font-size: 12px;
+}
+
+#update-zip {
+  font-weight: bold;
+}
+
+#update-icon {
+  position: absolute;
+  top: 26px;
+  left: 7px;
+  width: 110px;
+}
 
 /* the MONITOR DIALOG displays solver progress and messages */
 #monitor-dlg {

@@ -794,8 +794,13 @@ class Controller {
         () => UI.setPasteMapping());
     this.paste_modal.cancel.addEventListener('click',
         () => UI.paste_modal.hide());
+
+    // The UPDATE dialog appears when a new version has been released.
+    this.update_modal = new ModalDialog('update');
+    this.update_modal.close.addEventListener('click',
+        () => UI.update_modal.hide());
     
-    // Ensure that clicking activities list modal cancels the connection.
+    // Ensure that clicking the activities list modal cancels the connection.
     // NOTE: Clicking on list items generates mouse events for this modal.
     // Therefore, the connecting actions are called from this routine.
     // The necessary data is passed by the list elements.

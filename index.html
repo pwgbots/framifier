@@ -46,7 +46,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // Create global variables
     var
       // Version number
-      FRAMIFIER_VERSION = '0.1.2',
+      FRAMIFIER_VERSION = '0.1.3',
       // GitHub repository
       GITHUB_REPOSITORY = 'https://github.com/pwgbots/framifier',
       // Create the XML parser
@@ -73,8 +73,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
           warning: new Audio('sounds/warning.wav'),
           error: new Audio('sounds/error.wav')
         };
-      
-      
+
     function loadFRAMifier() {
       // Ensures that the FRAMifier HTML and scripts will be the latest
       // version by reloading unless URL contains current time stamp
@@ -140,8 +139,60 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       AUTO_SAVE = new ModelAutoSaver();
       // Create a new FRAMifier model
       UI.createNewModel();
+      // Check for software updates.
+      checkForNewerVersion();
     }
     
+    function checkForNewerVersion() {
+      // Notify user when a newer version exists on Github.
+      const
+          url = 'https://api.github.com/repos/pwgbots/framifier/tags',
+          check_failed = 'Check for new version on Github failed';
+      // Read FRAMifier tag list from Github (API returns a JSON string).
+      fetch(url)
+        .then((response) => {
+            if(!response.ok) {
+              UI.alert(`ERROR ${response.status}: ${response.statusText}`);
+            }
+            return response.text();
+          })
+        .then((data) => {
+            // Parse the JSON string.
+            let jsr;
+            try {
+              jsr = JSON.parse(data);
+            } catch(err) {
+              console.log('ERROR while parsing JSON:', err, data);
+              UI.warn(check_failed);
+              return;
+            }
+            // The result should be an array having at least 1 element.
+            if(!(Array.isArray(jsr) && jsr.length)) {
+              console.log('Version JSON:', jsr);
+              UI.warn(check_failed);
+              return;
+            }
+            // Make a list of only the version tags.
+            // NOTE: The API has sorted these in decreasing order.
+            const vlist = [];
+            for(let i = 0; i < jsr.length; i++) {
+              vlist.push(jsr[i].name);
+            }
+            console.log('FRAMifier releases:', vlist);
+            // Strip the leading 'v' of the latest version (first element).
+            const latest = vlist[0].substring(1);
+            // Version tags have semantic structure
+            if(earlierVersion(FRAMIFIER_VERSION, latest)) {
+              const m = UI.update_modal;
+              m.element('version').innerText = 'version ' + latest;
+              m.element('pre').innerText = (latest.startsWith('0.') ? 'pre-' : '');
+              m.element('zip').href = jsr[0].zipball_url;
+              m.show();
+            }
+          })
+        .catch((err) => UI.warn(check_failed, err));      
+    }
+
   </script>
 </head>
 <body onload="loadFRAMifier();">
@@ -708,6 +759,26 @@ where X can be one or several of these letters: AFLS
     </div>
   </div>  
 
+  <!-- the UPDATE modal notifies that an update is available -->
+  <div id="update-modal" class="modal">
+    <div id="update-dlg" class="inp-dlg">
+      <div class="dlg-title" style="background-color: #cc88b0">
+        Software update
+        <img class="close-btn" src="images/close.png">
+      </div>
+      <div id="update-msg">
+        <img id="update-icon" src="images/logo.png">
+        <div id="update-version"></div>
+        <div id="update-release">
+          has been <span id="update-pre">pre-</span>released on
+          <a href="https://github.com/pwgbots/framifier/releases" target="_blank">Github</a>.<br>
+          Click <a id="update-zip" target="_blank">here</a>
+          to download the ZIP-file.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Pop-up twin list for linking to sub-activities -->
   <div id="sub-activities-modal" class="modal">
     <div id="sub-activities-list">
@@ -731,6 +802,6 @@ where X can be one or several of these letters: AFLS
     <div id="deep-link-menu">
     </div>
   </div>
-  
+
 </body>
 </html>
