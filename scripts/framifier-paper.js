@@ -33,41 +33,43 @@ SOFTWARE.
 // A shape is a group of one or more SVG elements with a time-based ID
 // number, and typically represents an entity in a FRAMifier model diagram.
 class Shape {
-  constructor() {
-    this.id = randomID();
-    if(UI.paper) {
+  constructor(paper, obj) {
+    if(paper && obj) {
       // Create a new SVG element, but do not add it to the main SVG object.
-      this.element = UI.paper.newSVGElement('svg');
+      this.paper = paper;
+      this.object = obj;
+      this.id = paper.id + '__' + obj.identifier;
+      this.element = this.paper.newSVGElement('svg');
       this.element.id = this.id;
     }
   }
   
   clear() {
     // Remove all composing elements from this shape's SVG object.
-    UI.paper.clearSVGElement(this.element);
+    this.paper.clearSVGElement(this.element);
   }
 
   appendToDOM() {
     // Append this shape's SVG element to the main SVG object.
     const el = document.getElementById(this.id);
     // Replace existing element, if it exists.
-    if(el) UI.paper.svg.removeChild(el);
+    if(el) this.paper.svg.removeChild(el);
     // Add the new version.
-    UI.paper.svg.appendChild(this.element);
+    this.paper.svg.appendChild(this.element);
   }
   
   removeFromDOM() {
     // Remove this shape's SVG element from the main SVG object.
     const el = document.getElementById(this.id);
-    if(el) UI.paper.svg.removeChild(el);
+    if(el) this.paper.svg.removeChild(el);
     this.element = null;
   }
 
   addPath(path, attrs) {
     // Append a path to the SVG element for this shape.
-    const el = UI.paper.newSVGElement('path');
+    const el = this.paper.newSVGElement('path');
     el.setAttribute('d', path.join(''));
-    UI.paper.addSVGAttributes(el, attrs);
+    this.paper.addSVGAttributes(el, attrs);
     this.element.appendChild(el);
     return el;
   }
@@ -88,14 +90,14 @@ class Shape {
             attrs['font-size'] : 8),
         weight = (attrs.hasOwnProperty('font-weight') ?
             attrs['font-weight'] : 400),
-        fh = UI.paper.font_heights[size],
-        el = UI.paper.newSVGElement('text');
+        fh = this.paper.font_heights[size],
+        el = this.paper.newSVGElement('text');
     el.setAttribute('x', x);
     el.setAttribute('y', y + 0.35*fh);
     el.setAttribute('textLength',
-        UI.paper.numberSize(number, size, weight).width);
+        this.paper.numberSize(number, size, weight).width);
     el.textContent = number;
-    UI.paper.addSVGAttributes(el, attrs);
+    this.paper.addSVGAttributes(el, attrs);
     this.element.appendChild(el);
     return el;
   }
@@ -116,14 +118,14 @@ class Shape {
     // NOTE: Subtract 30% of 1 line height more, or the text is consistently
     // too low.
     const
-        fh = UI.paper.font_heights[size],
+        fh = this.paper.font_heights[size],
         cy = y - (lines.length + 0.3) * fh/2,
-        el = UI.paper.newSVGElement('text');
+        el = this.paper.newSVGElement('text');
     el.setAttribute('x', x);
     el.setAttribute('y', cy);
-    UI.paper.addSVGAttributes(el, attrs);
+    this.paper.addSVGAttributes(el, attrs);
     for(let i = 0; i < lines.length; i++) {
-      const ts = UI.paper.newSVGElement('tspan');
+      const ts = this.paper.newSVGElement('tspan');
       ts.setAttribute('x', x);
       ts.setAttribute('dy', fh);
       ts.setAttribute('pointer-events', 'inherit');
@@ -141,23 +143,23 @@ class Shape {
   addRect(x, y, w, h, attrs) {
     // Add a rectangle with center point (x, y), width w, and height h.
     // NOTE: For a "roundbox", pass the corner radii rx and ry.
-    const el = UI.paper.newSVGElement('rect');
+    const el = this.paper.newSVGElement('rect');
     el.setAttribute('x', x - w/2);
     el.setAttribute('y', y - h/2);
     el.setAttribute('width', Math.max(0, w));
     el.setAttribute('height', Math.max(0, h));
-    UI.paper.addSVGAttributes(el, attrs);
+    this.paper.addSVGAttributes(el, attrs);
     this.element.appendChild(el);
     return el;
   }
 
   addCircle(x, y, r, attrs) {
     // Add a circle with center point (x, y) and radius r.
-    const el = UI.paper.newSVGElement('circle');
+    const el = this.paper.newSVGElement('circle');
     el.setAttribute('cx', x);
     el.setAttribute('cy', y);
     el.setAttribute('r', r);
-    UI.paper.addSVGAttributes(el, attrs);
+    this.paper.addSVGAttributes(el, attrs);
     this.element.appendChild(el);
     return el;
   }
@@ -165,22 +167,22 @@ class Shape {
   addEllipse(x, y, rx, ry, attrs) {
     // Add an ellipse with center point (x, y), and specified radii and
     // attributes.
-    const el = UI.paper.newSVGElement('ellipse');
+    const el = this.paper.newSVGElement('ellipse');
     el.setAttribute('cx', x);
     el.setAttribute('cy', y);
     el.setAttribute('rx', rx);
     el.setAttribute('ry', ry);
-    UI.paper.addSVGAttributes(el, attrs);
+    this.paper.addSVGAttributes(el, attrs);
     this.element.appendChild(el);
     return el;
   }
 
   addSVG(x, y, attrs) {
     // Add an SVG subelement with top-left (x, y) and specified attributes.
-    const el = UI.paper.newSVGElement('svg');
+    const el = this.paper.newSVGElement('svg');
     el.setAttribute('x', x);
     el.setAttribute('y', y);
-    UI.paper.addSVGAttributes(el, attrs);
+    this.paper.addSVGAttributes(el, attrs);
     this.element.appendChild(el);
     return el;
   }
@@ -256,11 +258,14 @@ class Shape {
 } // END of class Shape
 
 
-// CLASS Paper (the SVG diagram)
+// CLASS Paper (draws an SVG diagram)
 class Paper {
-  constructor() {
-    this.svg = document.getElementById('svg-root');
-    this.container = document.getElementById('cc');
+  constructor(id) {
+    this.id = id;
+    this.container = document.getElementById(id + '-container');
+    this.svg = document.getElementById(id + '-svg');
+    // Dictionary of shapes to be drawn (with their ID as index).
+    this.shapes = {};
     this.height = 100;
     this.width = 200;
     this.zoom_factor = 1;
@@ -311,7 +316,8 @@ class Paper {
   }
   
   clear() {
-    // First, clear the entire SVG
+    // Clear the shapes dictionary and the entire SVG.
+    this.shapes = {};
     this.clearSVGElement(this.svg);
     // Set default style properties
     this.svg.setAttribute('font-family', this.font_name);
@@ -327,9 +333,9 @@ class Paper {
         chev = 'M0,0 L10,5 L0,10 L4,5 z';
 
     // NOTE: standard SVG elements are defined as properties of this paper
-    this.size_box = '__c_o_m_p_u_t_e__b_b_o_x__ID*';
-    this.drag_line = '__d_r_a_g__l_i_n_e__ID*';
-    this.drag_rect = '__d_r_a_g__r_e_c_t__ID*';
+    this.size_box = this.id + '__c_o_m_p_u_t_e__b_b_o_x__ID*';
+    this.drag_line = this.id + '__d_r_a_g__l_i_n_e__ID*';
+    this.drag_rect = this.id + '__d_r_a_g__r_e_c_t__ID*';
     let id = 'c_h_e_v_r_o_n__t_i_p__ID*';
     this.chevron = `url(#${id})`;
     this.addMarker(defs, id, chev, 8, this.palette.rim);
@@ -566,9 +572,29 @@ class Paper {
     }
     return {width: w, height: h};
   }
+
+  //  
+  // Shapes are only used to draw model diagrams.
+  //
+  
+  createShape(obj) {
+    // Add shape for model entity `obj`.
+    const oid = obj.identifier;
+    if(this.shapes.hasOwnProperty(oid)) {
+      this.shapes[oid].clear();
+    } else {
+      this.shapes[oid] = new Shape(this, obj);
+    }
+    return this.shapes[oid];
+  }
+  
+  moveShape(obj) {
+    const oid = obj.identifier;
+    if(this.shapes.hasOwnProperty(oid)) this.shapes[oid].moveTo(obj.x, obj.y);
+  }
   
   removeInvisibleSVG() {
-    // Removes SVG elements used by the user interface (not part of the model)
+    // Remove SVG elements used by the user interface (not part of the model).
     let el = document.getElementById(this.size_box);
     if(el) this.svg.removeChild(el);
     el = document.getElementById(this.drag_line);
@@ -593,7 +619,7 @@ class Paper {
   }
 
   fitToSize(margin=30) {
-    // Adjust the dimensions of the main SVG to fit the graph plus 15px margin
+    // Adjust the dimensions of the main SVG to fit the graph plus margin
     // all around
     this.removeInvisibleSVG();
     const
@@ -713,7 +739,9 @@ class Paper {
         // of the TO connector.
     let tcx = x2,
         tcy = y2;
-    if(UI.to_connector && UI.to_activity) {
+    if(UI.to_connector && UI.to_activity &&
+        // NOTE: Do not modify point if TO activity is in Subfunction viewer.
+        !UI.to_connector.parentElement.id.startsWith('subfunction')) {
       const
           tasp = UI.to_connector.dataset.aspect,
           angle = 'ORPITC'.indexOf(tasp) * Math.PI / 3,
@@ -834,7 +862,7 @@ class Paper {
     // Remove shapes of "deep link" objects from the paper.
     for(let k in this.drawn_deep_links) {
       if(this.drawn_deep_links.hasOwnProperty(k)) {
-        this.drawn_deep_links[k].shape.removeFromDOM();
+        this.shapes[drawn_deep_links[k].id].removeFromDOM();
       }
     }
     this.drawn_deep_links = {};
@@ -915,14 +943,15 @@ class Paper {
         stroke_width,
         chev,
         ady;
-    // Clear previous drawing.
-    l.shape.clear();
     const
-        // Link is dashed when it has no assiciated aspects.
+        // Clear previous drawing.
+        ls = this.createShape(l),
+        // Link is dashed when it has no associated aspects.
         sda = (l.aspects.length ? 'none' : UI.sda.dash),
         activated = l.containsActivated(MODEL.t),
         active_color = l.activeColor(MODEL.t),
-        vn = l.visibleNodes;
+        vn = l.visibleNodes(this.id === 'main' ?
+            MODEL.focal_activity : SUBFUNCTION_VIEWER.activity);
     // Double-check: do not draw unless both activities are visible.
     if(!vn[0] || !vn[1]) {
       const cdl = this.comprisingDeepLink(l);
@@ -1016,7 +1045,7 @@ class Paper {
     // First draw a thick but near-transparent line so that the mouse
     // events is triggered sooner.
     const
-        le = l.shape.addPath(
+        le = ls.addPath(
             [`M${x1},${y1}C${fcx},${fcy},${tcx},${tcy},${x2},${y2}`],
             {fill: 'none', stroke: 'white', 'stroke-width': 9,
                 'stroke-linecap': 'round', opacity: 0.01}),
@@ -1033,8 +1062,8 @@ class Paper {
         () => { UI.setLinkUnderCursor(null); });
 /*
     // Display control points (for testing & debugging).
-    l.shape.addCircle(fcx, fcy, 2, {fill: 'red'});
-    l.shape.addCircle(tcx, tcy, 2, {fill: 'blue'});
+    ls.addCircle(fcx, fcy, 2, {fill: 'red'});
+    ls.addCircle(tcx, tcy, 2, {fill: 'blue'});
 */
     // Add shape to list of drawn deep links if applicable.
     if(ndl) this.drawn_deep_links[l.identifier] = l;
@@ -1048,7 +1077,7 @@ class Paper {
       chev = this.deep_chevron;
       opac = 0.75;
     }
-    const tl = l.shape.addPath(
+    const tl = ls.addPath(
         [`M${x1},${y1}C${fcx},${fcy},${tcx},${tcy},${x2},${y2}`],
         {fill: 'none', stroke: stroke_color, 'stroke-width': stroke_width,
             'stroke-dasharray': sda, 'stroke-linecap': 'round',
@@ -1081,7 +1110,7 @@ class Paper {
             aid = a.identifier,
             bp = this.bezierPoint(
                 [x1, y1], [fcx, fcy], [tcx, tcy], [x2, y2], p),
-            le = l.shape.addText(bp[0], bp[1], a.name_lines,
+            le = ls.addText(bp[0], bp[1], a.name_lines,
                 {'font-size': 9, 'pointer-events': 'auto'}),
             nimbus = (a.comments && DOCUMENTATION_MANAGER.visible ?
                 ', 0 0 3.5px rgb(0,80,255)' : '');
@@ -1133,15 +1162,15 @@ class Paper {
               bh = nbb.height + 2,
               bx = bp[0] + (a.width + bw) / 2,
               by = bp[1];
-          l.shape.addRect(bx, by, bw, bh,
+          ls.addRect(bx, by, bw, bh,
               {stroke: '#80a0ff', 'stroke-width': 0.5, fill: '#d0f0ff'});
           if(r <= VM.ERROR || r >= VM.EXCEPTION) {
-            l.shape.addNumber(bx, by, s + extra,
+            ls.addNumber(bx, by, s + extra,
                 {'font-size': 9, 'fill': this.palette.VM_error});
           } else {
-            l.shape.addNumber(bx - bw / 2 + 2 + nobb.width / 2, by, s,
+            ls.addNumber(bx - bw / 2 + 2 + nobb.width / 2, by, s,
                 {'font-size': 9, 'fill': '#0000a0', 'font-weight': 700});
-            l.shape.addText(bx + nobb.width, by, extra,
+            ls.addText(bx + nobb.width, by, extra,
                 {'font-size': 9, 'fill': '#f07000'});
           }
         }
@@ -1149,19 +1178,22 @@ class Paper {
       }
     }
     // Highlight shape if it has comments.
-    l.shape.element.setAttribute('style',
+    ls.element.setAttribute('style',
         (DOCUMENTATION_MANAGER.visible && l.comments ?
             this.documented_filter : ''));
-    l.shape.appendToDOM();
+    ls.appendToDOM();
   }
 
   drawActivity(act, dx=0, dy=0) {
-    // Clear previous drawing.
-    act.shape.clear();
-    // Do not draw process unless in focal activity.
-    if(MODEL.focal_activity.sub_activities.indexOf(act) < 0) return;
+    // When drawing a model, do not draw activities unless in focal activity.
+    if(this.id === 'main' && MODEL.focal_activity.sub_activities.indexOf(act) < 0) {
+      delete this.shapes[act.identifier];
+      return;
+    }
     // Set local constants and variables.
     const
+        // Clear previous drawing.
+        as = this.createShape(act),
         background = act.isBackground,
         x = act.x + dx,
         y = act.y + dy,
@@ -1184,18 +1216,18 @@ class Paper {
       stroke_width = 2.5;
     }
     // Draw frame using colors as defined above.
-    act.shape.addPath(['M', x - hw, ',', y, 'l', qw, ',-', hh,
+    as.addPath(['M', x - hw, ',', y, 'l', qw, ',-', hh,
         'l', hw, ',0l', qw, ',', hh, 'l-', qw, ',', hh, 'l-', hw, ',0Z'],
         {fill: fill_color, stroke: stroke_color,
             'stroke-width': stroke_width});
     if(background) {
-      act.shape.addPath(['M', x, ',', y, 'l', qw, ',',
+      as.addPath(['M', x, ',', y, 'l', qw, ',',
           (act.isExit ? '-' : ''), hh - 0.5, 'l-', hw, ',0Z'],
           {fill: 'white', opacity: 0.6});
     }
     // Draw inner shadow if activity has sub_activities.
     if(!act.isLeaf) {
-      act.shape.addPath(['M', x - (hw-2.5), ',', y, 'l', (qw-1), ',-', (hh-2),
+      as.addPath(['M', x - (hw-2.5), ',', y, 'l', (qw-1), ',-', (hh-2),
           'l', (hw-2.5), ',0l', (qw-1), ',', (hh-2), 'l-', (qw-1), ',', (hh-2),
           'l-', (hw-2.5), ',0Z'],
               {fill: 'none', stroke: stroke_color, 'stroke-width': 5,
@@ -1209,7 +1241,7 @@ class Paper {
         cd = 1.24;
         cd2 = 2.5;
       }
-      act.shape.addPath(['M', x - (hw-cd2), ',', y, 'l', (qw-cd), ',-', (hh-cd2),
+      as.addPath(['M', x - (hw-cd2), ',', y, 'l', (qw-cd), ',-', (hh-cd2),
           'l', (hw-cd2), ',0l', (qw-cd), ',', (hh-cd2), 'l-', (qw-cd), ',', (hh-cd2),
           'l-', (hw-cd2), ',0Z'],
               {fill: 'none', stroke: act.actor.color, 'stroke-width': 4});      
@@ -1226,15 +1258,15 @@ class Paper {
           a = Math.PI * i / 3,
           ax = x + Math.cos(a) * hw * 1.1,
           ay = y + Math.sin(a) * hw * 1.1;
-      act.shape.addConnector(ax, ay, c, aid, cl[c]);
+      as.addConnector(ax, ay, c, aid, cl[c]);
     }
     // Always draw process name plus actor name (if any).
     const
         th = act.name_lines.split('\n').length * this.font_heights[10] / 2,
         cy = (act.hasActor ? y - 8 : y - 2);
-    act.shape.addText(x, cy, act.name_lines, {'font-size': 10});
+    as.addText(x, cy, act.name_lines, {'font-size': 10});
     if(act.hasActor) {
-      act.shape.addText(x, cy + th + 6, act.actor.name,
+      as.addText(x, cy + th + 6, act.actor.name,
           {'font-size': 10, fill: this.palette.actor_font,
               'font-style': 'italic'});
     }
@@ -1247,16 +1279,17 @@ class Paper {
     } else if(DOCUMENTATION_MANAGER.visible && act.comments) {
       filter = this.documented_filter;
     }
-    act.shape.element.firstChild.setAttribute('style', filter);
+    as.element.firstChild.setAttribute('style', filter);
     // Make shape slightly transparent.
-    act.shape.element.setAttribute('opacity', 0.9);
-    act.shape.appendToDOM();    
+    as.element.setAttribute('opacity', 0.9);
+    as.appendToDOM();    
   }
   
   drawNote(note, dx=0, dy=0) {
     // NOTE: call resize if text contains fields, as text determines size
     note.resize();
     const
+        ns = this.createShape(note),
         x = note.x + dx,
         y = note.y + dy,
         w = note.width,
@@ -1269,16 +1302,15 @@ class Paper {
       stroke_color = this.palette.note_rim;
       stroke_width = 0.6;
     }
-    note.shape.clear();
-    note.shape.addRect(x, y, w, h,
+    ns.addRect(x, y, w, h,
         {fill: this.palette.note_fill, opacity: 0.75, stroke: stroke_color,
             'stroke-width': stroke_width, rx: 4, ry: 4});
-    note.shape.addRect(x, y, w-2, h-2,
+    ns.addRect(x, y, w-2, h-2,
         {fill: 'none', stroke: this.palette.note_band, 'stroke-width': 1.5,
             rx: 3, ry: 3});
-    note.shape.addText(x - w/2 + 4, y, note.lines,
+    ns.addText(x - w/2 + 4, y, note.lines,
         {fill: this.palette.note_font, 'text-anchor': 'start'});
-    note.shape.appendToDOM();
+    ns.appendToDOM();
   }
   
 } // END of class Paper

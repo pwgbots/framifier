@@ -343,7 +343,7 @@ class Finder {
       UI.makeFocalActivity(obj.parent);
       // ... and select the entityt.
       MODEL.select(obj);
-      UI.scrollIntoView(obj.shape.element.childNodes[0]);
+      UI.scrollIntoView(UI.paper.shapes[obj.identifier].element.childNodes[0]);
     }
     // NOTE: Return the object to save a second lookup by revealExpression.
     return obj;

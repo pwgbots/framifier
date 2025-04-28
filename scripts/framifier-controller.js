@@ -155,7 +155,7 @@ class Controller {
     this.version_div = document.getElementById('framifier-version-number');
     this.version_div.innerHTML = 'Version ' + this.version_number;
     // Initialize the "paper" for drawing the model diagram.
-    this.paper = new Paper();
+    this.paper = new Paper('main');
     // The properties below are used to avoid too frequent redrawing of
     // the SVG model diagram.
     this.busy_drawing = false;
@@ -221,7 +221,7 @@ class Controller {
     this.node_btns = ['activity', 'note'];
     this.edit_btns = ['clone', 'paste', 'delete', 'undo', 'redo'];
     this.model_btns = ['settings', 'save', 'savediagram', 'finder',
-        'actors', 'monitor', 'solve'];
+        'actors', 'monitor', 'subfunction', 'solve'];
     this.other_btns = ['new', 'load', 'documentation',
         'parent', 'lift', 'solve', 'stop', 'reset', 'zoomin', 'zoomout',
         'stepback', 'stepforward', 'autosave', 'recall'];
@@ -360,21 +360,6 @@ class Controller {
     return VM.sig2Dig(n) + ' ' + 'kMGTP'.charAt(m) + 'B';
   }
   
-  // Shapes are only used to draw model diagrams.
-  
-  createShape(mdl) {
-    if(this.paper) return new Shape(mdl);
-    return null;
-  }
-  
-  moveShapeTo(shape, x, y) {
-    if(shape) shape.moveTo(x, y);
-  }
-  
-  removeShape(shape) {
-    if(shape) shape.removeFromDOM();
-  }
-
   // Methods to ensure proper naming of entities.
 
   cleanName(name) {
@@ -606,18 +591,17 @@ class Controller {
   }
   
   addListeners() {
-    // NOTE: "cc" stands for "canvas container"; this DOM element holds
-    // the model diagram SVG.
-    this.cc = document.getElementById('cc');
-    this.cc.addEventListener('mousemove', (event) => UI.mouseMove(event));
-    this.cc.addEventListener('mouseup', (event) => UI.mouseUp(event));
-    this.cc.addEventListener('mousedown', (event) => UI.mouseDown(event));
+    // DOM element "main-container" holds the model diagram SVG.
+    this.mc = document.getElementById('main-container');
+    this.mc.addEventListener('mousemove', (event) => UI.mouseMove(event));
+    this.mc.addEventListener('mouseup', (event) => UI.mouseUp(event));
+    this.mc.addEventListener('mousedown', (event) => UI.mouseDown(event));
     // NOTE: Responding to `mouseenter` is needed to update the cursor
     // position after closing a modal dialog.
-    this.cc.addEventListener('mouseenter', (event) => UI.mouseMove(event));
+    this.mc.addEventListener('mouseenter', (event) => UI.mouseMove(event));
     // Aspects can be dragged from the Finder to add them to a link.
-    this.cc.addEventListener('dragover', (event) => UI.dragOver(event));
-    this.cc.addEventListener('drop', (event) => UI.drop(event));
+    this.mc.addEventListener('dragover', (event) => UI.dragOver(event));
+    this.mc.addEventListener('drop', (event) => UI.drop(event));
     
     // Disable dragging on all images.
     const
@@ -644,12 +628,16 @@ class Controller {
     const tdf = (event) => UI.toggleDialog(event);
     this.buttons.finder.addEventListener('click', tdf);
     this.buttons.monitor.addEventListener('click', tdf);
+    this.buttons.subfunction.addEventListener('click', tdf);
     this.buttons.documentation.addEventListener('click', tdf);
     // Activity hierarchy navigation elements:
     this.focal_name.addEventListener('click',
         () => UI.showActivityPropertiesDialog(MODEL.focal_activity));
     this.focal_name.addEventListener('mousemove',
-        () => DOCUMENTATION_MANAGER.update(MODEL.focal_activity, true));
+        () => {
+            DOCUMENTATION_MANAGER.update(MODEL.focal_activity, true);
+            SUBFUNCTION_VIEWER.update(MODEL.focal_activity.parent, true);
+          });
     this.buttons.parent.addEventListener('click',
         () => UI.showParentActivity());
     this.buttons.lift.addEventListener('click',
@@ -931,6 +919,7 @@ class Controller {
     if(letters.indexOf('F') >= 0) FINDER.updateDialog();
     if(letters.indexOf('I') >= 0) DOCUMENTATION_MANAGER.updateDialog();
     if(letters.indexOf('M') >= 0) MONITOR.updateDialog();
+    if(letters.indexOf('V') >= 0) SUBFUNCTION_VIEWER.updateDialog();
   }
 
   loadModelFromXML(xml) {
@@ -981,7 +970,9 @@ class Controller {
     // NOTE: When "moving up" in the activity hierarchy, bring the former
     // focal activity into view.
     if(fa.parent === MODEL.focal_activity) {
-      this.scrollIntoView(fa.shape.element.childNodes[0]);
+      this.scrollIntoView(this.paper.shapes[fa.identifier].element.childNodes[0]);
+      // NOTE: Do NOT clear the subfunction viewer, as modelers may wish to
+      // keep viewing a lower level activity.
     }
   }
   
@@ -1330,12 +1321,12 @@ class Controller {
       // style attributes, so update the visibility status
       was_hidden = !mgr.visible;
     }
-    // Otherwise, toggle the dialog visibility
+    // Toggle the dialog visibility
     this.toggle(tde.id);
     UI.buttons[dlg].classList.toggle('stay-activ');
     if(mgr) mgr.visible = was_hidden;
     let t, l;
-    if(top in tde.dataset && left in tde.dataset) {
+    if('top' in tde.dataset && 'left' in tde.dataset) {
       // Open at position after last drag (recorded in DOM data attributes)
       t = tde.dataset.top;
       l = tde.dataset.left;
@@ -1498,7 +1489,9 @@ class Controller {
       let x = UI.mouse_x,
           y = UI.mouse_y;
       // ... unless the cursor is over a suitable connector.
-      if(UI.to_connector && UI.to_activity) {
+      // NOTE: Do not modify point if TO activity is in Subfunction viewer.
+      if(UI.to_connector && UI.to_activity &&
+          !UI.to_connector.parentElement.id.startsWith('subfunction')) {
         const
             tasp = UI.to_connector.dataset.aspect,
             angle = 'ORPITC'.indexOf(tasp) * Math.PI / 3,
@@ -1527,11 +1520,16 @@ class Controller {
           tcon: UI.to_connector,
           fsub: [],
           tsub: [],
-          aspect: '' 
+          aspect: '',
+          subfv: false
         };
       if(ctm.fact) ctm.fsub = ctm.fact.leafActivities;
       if(ctm.tact) ctm.tsub = ctm.tact.leafActivities;
       if(ctm.tact && ctm.tcon) ctm.aspect = ctm.tcon.dataset.aspect;
+      // NOTE: Set flag when connecting to activity in Subfunction viewer.
+      if(ctm.tcon && ctm.tcon.parentElement.id.startsWith('subfunction')) {
+        ctm.subfv = true;
+      }
       UI.connection_to_make = ctm;
       if(ctm.fsub.length || ctm.tsub.length) {
         // Prompt modeler to specify which subactivity to link from/to.
@@ -1583,6 +1581,8 @@ class Controller {
         this.drawObject(l.to_activity);
         this.drawObject(l);
       }
+      // When connecting to activity in Subfunction viewer, update it.
+      if(ctm.subfv) SUBFUNCTION_VIEWER.updateDialog();
     }
     // Terminate the connection process.
     this.connection_to_make = null;
@@ -1716,7 +1716,7 @@ class Controller {
     const
         node_btns = 'activity note ',
         edit_btns = 'clone paste delete undo redo ',
-        model_btns = 'settings save savediagram finder monitor solve';
+        model_btns = 'settings save savediagram finder subfunction monitor solve';
     if(MODEL === null) {
       this.disableButtons(node_btns + edit_btns + model_btns);
       return;
@@ -1839,7 +1839,7 @@ class Controller {
       UI.paper.drawActivity(ta);
       // NOTE: Element is persistent, so semi-transparency must also be
       // undone.
-      ta.shape.element.setAttribute('opacity', 1);
+      UI.paper.shapes[ta.identifier].element.setAttribute('opacity', 1);
     }
     // First check aspects, as these lie on top of links.
     if(this.aspect_under_cursor) {
@@ -1874,6 +1874,7 @@ class Controller {
     const on_entity = (this.on_aspect || this.on_link || this.on_activity);
     if(on_entity) {
       DOCUMENTATION_MANAGER.update(on_entity, e.shiftKey);
+      if(this.on_activity) SUBFUNCTION_VIEWER.update(on_entity, e.shiftKey);
     } else if(this.on_note) {
       // When shift-moving over a note, show the model's documentation.
       DOCUMENTATION_MANAGER.update(MODEL, e.shiftKey);
@@ -2407,6 +2408,7 @@ class Controller {
       this.updateTimeStep();
       this.drawDiagram(MODEL);
       MONITOR.updateDialog();
+      SUBFUNCTION_VIEWER.updateDialog();
     }
   }
   
@@ -2418,6 +2420,7 @@ class Controller {
       this.updateTimeStep();
       this.drawDiagram(MODEL);
       MONITOR.updateDialog();
+      SUBFUNCTION_VIEWER.updateDialog();
     }
   }
   
@@ -2563,6 +2566,9 @@ class Controller {
     DOCUMENTATION_MANAGER.dialog.style.display = 'none';
     this.buttons.documentation.classList.remove('stay-activ');
     DOCUMENTATION_MANAGER.reset();
+    SUBFUNCTION_VIEWER.dialog.style.display = 'none';
+    this.buttons.subfunction.classList.remove('stay-activ');
+    SUBFUNCTION_VIEWER.reset();
     FINDER.dialog.style.display = 'none';
     this.buttons.finder.classList.remove('stay-activ');
     FINDER.reset();
@@ -2668,7 +2674,7 @@ class Controller {
       MODEL.select(n);
       UI.drawDiagram(MODEL);
       // Generate a mousemove event for the drawing canvas to update the cursor etc.
-      this.cc.dispatchEvent(new Event('mousemove'));
+      this.mc.dispatchEvent(new Event('mousemove'));
       this.updateButtons();
     }
   }

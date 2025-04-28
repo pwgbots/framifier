@@ -758,14 +758,6 @@ function addOne(id) {
   return (safeStrToInt(id) + 1).toString();
 }
 
-function randomID() {
-  // Generates a 22+ hex digit ID: timestamp plus 12 random bits as suffix
-  // plus 8 more random hex digits (earlier shorter version caused doubles!)
-  const d = ((new Date()).getTime() + Math.random()) * 4096,
-        e = Math.floor(Math.random() * 4294967296);
-  return (Math.floor(d)).toString(16) + e.toString(16);
-}
-
 function escapedSingleQuotes(s) {
   // Return string `s` with "escaped" single quotes.
   return s.replace('\'', '\\\'');

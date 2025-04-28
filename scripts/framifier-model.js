@@ -942,7 +942,6 @@ class FRAMifierModel {
       // undo-XML
       this.deleteActivity(a.sub_activities[i]); 
     }
-    UI.removeShape(a.shape);
     // Remove activity from the activity containing it.
     const i = a.parent.sub_activities.indexOf(a);
     if(i >= 0) a.parent.sub_activities.splice(i, 1);
@@ -1509,7 +1508,6 @@ class ObjectWithXYWH {
     this.y = 0;
     this.width = 0;
     this.height = 0;
-    this.shape = UI.createShape(this);
   }
 
   alignToGrid() {
@@ -1530,7 +1528,7 @@ class ObjectWithXYWH {
     // (to avoid redrawing it)
     this.x += dx;
     this.y += dy;
-    UI.moveShapeTo(shape, this.x, this.y);
+    UI.paper.moveShape(this);
   }
 } // END of CLASS ObjectWithXYWH
 
@@ -2644,8 +2642,6 @@ class Link {
     // When not empty, this indicates that this link is a "virtual
     // container" for multiple "real" links.
     this.deep_links = [];
-    // For drawing, a link has its own shape (mouse responsive)
-    this.shape = UI.createShape(this);
   }
 
   get type() {
@@ -2716,11 +2712,10 @@ class Link {
     this.comments = l.comments;
   }
   
-  get visibleNodes() {
+  visibleNodes(fa) {
     // Returns tuple [from, to] where TRUE indicates that this node is
     // visible in the focal activity.
     const
-        fa = MODEL.focal_activity,
         fv = (fa.sub_activities.indexOf(this.from_activity) >= 0),
         tv = (fa.sub_activities.indexOf(this.to_activity) >= 0);
     return [fv, tv];

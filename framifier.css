@@ -73,13 +73,8 @@ td > img {
   margin-right: 3px;
 }
 
-#ccsa {
-  width: 100vw;
-  height: 80vh;
-}
-
-/* the chart container that holds the SVG paper in the main area */
-#cc {
+/* the main container that holds the SVG of the FRAM diagram */
+#main-container {
   min-width: 100vw;
   min-height: 80vh;
   background-color: #fdffff;
@@ -1055,6 +1050,43 @@ img.inline-cancel-btn {
   position: absolute;
   right: 20px;
   bottom: 3px;
+}
+
+/* the SUBFUNCTION DIALOG displays the diagram of a composite function */
+#subfunction-dlg {
+  display: none;
+  z-index: 140; /* should be second-highest of all dialogs (even modal ones) */
+  margin: 0;
+  width: 305px;
+  height: 200px;
+  min-width: 305px;
+  min-height: 200px;
+  max-height: 99vh;
+  max-width: 99vw;
+  opacity: 0.9;
+}
+
+#subfunction-title {
+  display: inline-block;
+  max-width: calc(100% - 22px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#subfunction-instruction {
+  position: absolute;
+  color: gray;
+  width: calc(100% - 24px);
+  text-align: center;
+  padding: 10px;
+}
+
+#subfunction-container {
+  margin: 2px;
+  width: calc(100% - 4px);
+  height: calc(100% - 28px);
+  overflow: scroll;
 }
 
 /* styles for the NOTE dialog */
