@@ -3176,6 +3176,7 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     md.element('author').value = model.author;
     md.element('grid-pixels').value = model.grid_pixels;
     md.element('cycles').value = model.run_length;
+    this.setBox('settings-arrow-heads', model.arrow_heads);
     this.setBox('settings-align-to-grid', model.align_to_grid);
     md.show('name');
   }
@@ -3192,8 +3193,11 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     document.title = model.name || 'FRAMifier';
     model.author = md.element('author').value.trim();
     // Some changes may necessitate redrawing the diagram.
-    let cb = UI.boxChecked('settings-align-to-grid'),
-        redraw = !model.align_to_grid && cb;
+    let cb = UI.boxChecked('settings-arrow-heads'),
+        redraw = !model.arrow_heads && cb;
+    model.arrow_heads = cb;
+    cb = UI.boxChecked('settings-align-to-grid');
+    redraw = !model.align_to_grid && cb;
     model.align_to_grid = cb;
     model.grid_pixels = Math.floor(px);
     model.run_length = Math.max(1, Math.floor(rl));

@@ -336,25 +336,7 @@ class Paper {
     this.size_box = this.id + '__c_o_m_p_u_t_e__b_b_o_x__ID*';
     this.drag_line = this.id + '__d_r_a_g__l_i_n_e__ID*';
     this.drag_rect = this.id + '__d_r_a_g__r_e_c_t__ID*';
-    let id = 'c_h_e_v_r_o_n__t_i_p__ID*';
-    this.chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 8, this.palette.rim);
-    id = 's_e_l_e_c_t_e_d__c_h_e_v_r_o_n__t_i_p__ID*';
-    this.selected_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 10, this.palette.select);
-    id = 'c_o_n_n_e_c_t_i_n_g__c_h_e_v_r_o_n__t_i_p__ID*';
-    this.connecting_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 10, this.palette.connecting);
-    id = 'f_e_e_d_b_a_c_k__c_h_e_v_r_o_n__t_i_p__ID*';
-    this.feedback_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 8, 'rgb(0, 0, 0)');
-    id = 'g_r_e_e_n__c_h_e_v_r_o_n__t_i_p__ID*';
-    this.green_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 8, this.palette.active);
-    id = 'd_e_e_p__c_h_e_v_r_o_n__t_i_p__ID*';
-    this.deep_chevron = `url(#${id})`;
-    this.addMarker(defs, id, chev, 10, 'rgb(128, 128, 144)');
-    id = 't_e_x_t__s_h_a_d_o_w__ID*';
+    let id = 't_e_x_t__s_h_a_d_o_w__ID*';
     this.text_shadow_filter = `filter: url(#${id})`;
     this.addShadowFilter(defs, id, 'rgb(255,255,255)', 2);
     id = 'd_o_c_u_m_e_n_t_e_d__ID*';
@@ -369,6 +351,42 @@ class Paper {
     id = 'a_c_t_i_v_e__l_i_n_k__ID*';
     this.active_link_filter = `filter: url(#${id}); opacity: 1`;
     this.addShadowFilter(defs, id, 'rgb(0,255,0)', 10);
+    if(MODEL && MODEL.draw_arrows) {
+      id = 'c_h_e_v_r_o_n__t_i_p__ID*';
+      this.chevron = `url(#${id})`;
+      this.addMarker(defs, id, chev, 8, this.palette.rim);
+      id = 's_e_l_e_c_t_e_d__c_h_e_v_r_o_n__t_i_p__ID*';
+      this.selected_chevron = `url(#${id})`;
+      this.addMarker(defs, id, chev, 10, this.palette.select);
+      id = 'c_o_n_n_e_c_t_i_n_g__c_h_e_v_r_o_n__t_i_p__ID*';
+      this.connecting_chevron = `url(#${id})`;
+      this.addMarker(defs, id, chev, 10, this.palette.connecting);
+      id = 'f_e_e_d_b_a_c_k__c_h_e_v_r_o_n__t_i_p__ID*';
+      this.feedback_chevron = `url(#${id})`;
+      this.addMarker(defs, id, chev, 8, 'rgb(0, 0, 0)');
+      id = 'g_r_e_e_n__c_h_e_v_r_o_n__t_i_p__ID*';
+      this.green_chevron = `url(#${id})`;
+      this.addMarker(defs, id, chev, 8, this.palette.active);
+      id = 'd_e_e_p__c_h_e_v_r_o_n__t_i_p__ID*';
+      this.deep_chevron = `url(#${id})`;
+      this.addMarker(defs, id, chev, 10, 'rgb(128, 128, 144)');
+      // Offsets (in px) for chevrons.
+      this.normal_chevron_y = 3;
+      this.large_chevron_y = 4;
+      this.chevron_space = 3;
+    } else {
+      // No chevron markers.
+      this.chevron = 'none';
+      this.selected_chevron = 'none';
+      this.connecting_chevron = 'none';
+      this.feedback_chevron = 'none';
+      this.green_chevron = 'none';
+      this.deep_chevron = 'none';
+      // No chevron offsets.
+      this.normal_chevron_y = 0;
+      this.large_chevron_y = 0;
+      this.chevron_space = 0;
+    }
     this.svg.appendChild(defs);
     this.changeFont(CONFIGURATION.default_font_name);
   }
@@ -967,7 +985,7 @@ class Paper {
       stroke_color = this.palette.select;
       stroke_width = 1.75;
       chev = this.selected_chevron;
-      ady = 4;
+      ady = this.large_chevron_y;
     } else {
       stroke_width = 1.25;
       if(activated || active_color !== this.palette.rim) {
@@ -985,7 +1003,7 @@ class Paper {
         stroke_color = this.palette.rim;
         chev = this.chevron;
       }
-      ady = 3;
+      ady = this.normal_chevron_y;
     }
     const
         fa = l.from_activity,
@@ -1038,8 +1056,8 @@ class Paper {
         tcpcos = Math.cos(tcpa),
         ccx2 = ((tc === 'R' && dcx > 0 && dcy > 0) ||
             (tc === 'C' && dcx > 0 && dcy < 0) ? -100 : 0);
-    x2 = cx2 + tcpcos * 10;
-    y2 = cy2 + tcpsin * 10;
+    x2 = cx2 + tcpcos * (7 + this.chevron_space);
+    y2 = cy2 + tcpsin * (7 + this.chevron_space);
     tcx = cx2 + tcpcos * (dr + 3 / part) + ccx2;
     tcy = cy2 + tcpsin * dr + (to_i && dcx < 0 ? dr - Math.sign(dcy) * 50 : 0);
     // First draw a thick but near-transparent line so that the mouse

@@ -59,6 +59,7 @@ class FRAMifierModel {
     this.orphan_list = [];
     
     // Model settings.
+    this.arrow_heads = true;
     this.grid_pixels = 20;
     this.align_to_grid = true;
     this.run_length = 10;
@@ -1090,6 +1091,7 @@ class FRAMifierModel {
         nodeParameterValue(node, 'next-aspect-number'));
     this.last_zoom_factor = safeStrToFloat(
         nodeParameterValue(node, 'zoom'), 1);
+    this.arrow_heads = nodeParameterValue(node, 'arrow-heads') === '1';
     this.align_to_grid = nodeParameterValue(node, 'align-to-grid') === '1';
     this.run_length = safeStrToInt(nodeParameterValue(node, 'run-length'), 10);
     this.name = xmlDecoded(nodeContentByTag(node, 'name'));
@@ -1174,6 +1176,7 @@ class FRAMifierModel {
         '" next-aspect-number="', this.next_aspect_number,
         '" zoom="', this.last_zoom_factor,
         '" run-length="', this.run_length, '"'].join('');
+    if(this.arrow_heads) p += ' arrow_heads="1"';
     if(this.align_to_grid) p += ' align-to-grid="1"';
     let xml = this.xml_header + ['<model', p, '><name>',  xmlEncoded(this.name),
         '</name><author>', xmlEncoded(this.author),
