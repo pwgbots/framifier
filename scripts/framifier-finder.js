@@ -139,7 +139,7 @@ class Finder {
           }
         }
       }
-      if(et.indexOf('L') >= 0) {
+      if(et.indexOf('C') >= 0) {
         imgs += '<img src="images/link.png">';
         for(let k in MODEL.links) if(MODEL.links.hasOwnProperty(k)) {
           // NOTE: "black-boxed" link identifiers are not prefixed => other test.
@@ -149,7 +149,7 @@ class Finder {
           if(!fp || patternMatch(ldn, this.filter_pattern)) {
             enl.push(k);
             this.entities.push(l);
-            addDistinct('L', this.filtered_types);
+            addDistinct('C', this.filtered_types);
           }
         }
       }
@@ -215,7 +215,7 @@ class Finder {
         el = []; // list of HTML elements (table rows) to be added
     let hdr = '(no entity selected)';
     if(se) {
-      hdr = `<em>${se.type}:</em> <strong>${se.displayName}</strong>`;
+      hdr = `<em>${se.FRAMType}:</em> <strong>${se.displayName}</strong>`;
       // Make occurrence list.
       if(se instanceof Activity || se instanceof Aspect) {
         // Activities and aspects "occur" in their parent activity.
@@ -289,10 +289,10 @@ class Finder {
     // look only for the entity types denoted by these letters.
     let ft = this.filter_input.value,
         et = VM.entity_letters;
-    if(/^(\*|[AFLS]+)\?/i.test(ft)) {
+    if(/^(\*|[ACFS]+)\?/i.test(ft)) {
       ft = ft.split('?');
       // NOTE: *? denotes "all entity types except constraints".
-      et = (ft[0] === '*' ? 'AFLS' : ft[0].toUpperCase());
+      et = (ft[0] === '*' ? 'ACFS' : ft[0].toUpperCase());
       ft = ft.slice(1).join('=');
     }
     this.filter_string = ft;

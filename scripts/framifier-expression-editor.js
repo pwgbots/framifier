@@ -54,22 +54,17 @@ class ExpressionEditor {
 <em>Move cursor over a</em> <code>symbol</code> <em>for explanation.</em>
 <p>
 <h4>Variables</h4>
-<p>Names of system aspects must be enclosed by brackets, e.g.,
+<p>Names of aspects must be enclosed by brackets, e.g.,
   <code>[some aspect]</code>, to distinguish them from pre-defined variables
-  (<code title="Cycle number (starts at 1)">c</code>,
+  (<code title="Cycle number (starts at 1)">cycle</code>,
   <code title="Simulated clock time (in hours)">now</code>,
+  <code title="Last time the function associated with this expression was activated">last</code>,
   <code title="A random number from the uniform distribution U(0, 1)">random</code>)
   and constants
   (<code title="Mathematical constant &pi; = ${Math.PI}">pi</code>,
   <code title="Logical constant true = 1
 NOTE: any non-zero value evaluates as true">true</code>,
-  <code title="Logical constant false = 0">false</code>,
-  <code title="Number of hours in 1 year">yr</code>,
-  <code title="Number of hours in 1 week">wk</code>,
-  <code title="Number of hours in 1 day">d</code>,
-  <code title="Number of hours in 1 hour (1)">h</code>,
-  <code title="Number of hours in 1 minute">m</code>,
-  <code title="Number of hours in 1 second">s</code>).
+  <code title="Logical constant false = 0">false</code>).
 </p>
 <h4>Operators</h4>
 <p><em>Monadic:</em>
@@ -129,9 +124,12 @@ NOTE: When omitted, the third parameter c defaults to (a+b)/2">triangular</code>
   <code title="X ; Y evaluates as a group or &ldquo;tuple&rdquo; (X, Y)
 NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates as (1;2;3;4;5)">X ; Y</code>
   (use only in combination with <code>max</code>, <code>min</code> and probabilistic operators)<br>
-  <em>Clock time:</em> <code>waituntil(</code>X<code>)</code> sets the simulation clock time to X hours
-  and evaluates as the new time X, or as 0 (<code>false</code>) if X < <code>now</code>;
-  <code>wait(</code>X<code>)</code> is shorthand for <code>waituntil(now + </code>X<code>)</code>. 
+
+  <em>Clock time:</em>
+  <code title="after X valuates as 0 if X < now, and otherwise as 1
+(adds a clock event for X)">after</code>,
+  <code title="until X evaluates as 1 if X < now, and otherwise as PENDING
+(adds a clock event for X)">until</code> 
 </p>
 <p>
   Monadic operators take precedence over dyadic operators.
@@ -173,7 +171,7 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
       this.aspect_div.style.display = 'none';
     } else {
       this.edited_expression = obj.expression;
-      this.type.innerText = 'system aspect';
+      this.type.innerText = 'aspect';
       this.scope_connector = '';
       this.scope.innerHTML =
           `(<em>scope:</em> ${obj.parent.displayName})`;
@@ -256,16 +254,32 @@ NOTE: Grouping groups results in a single group, e.g., (1;2);(3;4;5) evaluates a
   }
   
   get aspectNames() {
-    // Returns a list of names of all defined aspects.
-    // NOTE: `edited_object` is an aspect on a link => parent is that
-    // link, and FROM activty of that link defines the scope.
+    // Returns a list aspect names that can be used as variables.
+    // NOTE: `edited_object` is an aspect on a link => parent is the
+    // FROM activty of that link, and this defines the scope.
     const
-        ais = (this.edited_object instanceof Aspect ?
-            this.edited_object.parent.aspectsInScope :
-            this.edited_object.incomingAspects(this.edited_connector)),
-        list = [];
-    for(let i = 0; i < ais.length; i++) {
-      list.push(ais[i].displayName);
+        list = [],
+        eo = this.edited_object;
+    if(eo instanceof Aspect) {
+      // In expressions for output aspects of a function, all incoming
+      // aspects of this function can be used except for T-aspects.
+      const ocl = eo.parent.connections;
+      for(let c of 'CRPI') {
+        const cl = ocl[c];
+        for(let i = 0; i < cl.length; i++) {
+          const al = cl[i].aspects;
+          for(let j = 0; j < al.length; j++) {
+            list.push(al[j].displayName);
+          }
+        }
+      }
+    } else {
+      // In expressions for a CRPIT-connector, only aspects on links into
+      // this connector can be used.
+      const al = eo.relatedAspects(this.edited_connector);
+      for(let i = 0; i < al.length; i++) {
+        list.push(al[i].displayName);
+      }
     }
     return list;
   }  

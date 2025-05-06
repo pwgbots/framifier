@@ -31,11 +31,12 @@ SOFTWARE.
 
 // CLASS Expression
 class Expression {
-  constructor(obj, text) {
+  constructor(obj, text, connector='') {
     // Expressions are defined for system aspects and for "incoming"
     // CRPITs of activities.
     this.object = obj;
     this.text = text;
+    this.connector = connector;
      // A stack for local time step (to allow lazy evaluation).
     this.step = [];
     // An operand stack for computation (elements must be numeric).
@@ -50,6 +51,8 @@ class Expression {
     this.compiling = false;
     // While compiling, check whether any operand depends on time.
     this.is_static = true;
+    // Likewise check whether it uses time operators or symbols.
+    this.relates_to_time = false;
     // NOTE: VM expects result to be an array, even when expression is static.
     this.vector = [VM.NOT_COMPUTED];
     // Simulation clock time set points.
@@ -61,7 +64,12 @@ class Expression {
   
   get variableName() {
     // Return the name of the variable computed by this expression.
-    if(this.object) return this.object.displayName;
+    if(this.object) {
+      const
+          c = (this.object instanceof Activity && this.connector ?
+              circledLetter(this.connector) : '');
+      return c + this.object.displayName;
+    }
     return 'Unknown variable (no object)';
   }
 
@@ -114,7 +122,7 @@ class Expression {
     this.compiling = true;
     // Clear the VM instruction list.
     this.code = null;
-    const xp = new ExpressionParser(this.text, this.object);
+    const xp = new ExpressionParser(this.text, this.object, this.connector);
     if(xp.error === '') {
       this.update(xp);
     } else {
@@ -272,10 +280,13 @@ class Expression {
     // expression).
     if(t < 0 || this.isStatic) t = 0;
     if(t >= v.length) return VM.UNDEFINED;
-    if(v[t] === VM.NOT_COMPUTED || v[t] === VM.COMPUTING) {
-      v[t] = VM.NOT_COMPUTED;
-      this.compute(t);
+    // Check for recursive calls.
+    if(v[t] === VM.COMPUTING) {
+      console.log('Already computing expression for', this.variableName);
+      console.log(this.text);
+      return VM.CYCLIC;
     }
+    if(v[t] === VM.NOT_COMPUTED) this.compute(t);
     return v[t];
   }
   
@@ -459,6 +470,8 @@ class ExpressionParser {
   incomingExpression(c) {
     // Return incoming expression for connector `c` of the owner's parent
     // activity if the owner is an aspect, otherwise NULL.
+    // NOTE: This function is used by the expression parser to code for
+    // CRPIT symbols as operands.
     const
         valid = {
           'c': 'C',
@@ -511,13 +524,24 @@ class ExpressionParser {
 
     if(this.TRACE) console.log(
         `TRACE: Parsing variable "${name}" in expression for`,
-        this.ownerName, ' -->  ', this.expr);
+        this.ownerName, ' -->  ', this.expr, this);
 
     // Only aspects in scope can be used.
-    const aspects = (this.owner instanceof Aspect ?
-        this.owner.parent.aspectsInScope :
-        this.owner.incomingAspects(this.connector));
-
+    let aspects = [];
+    if(this.owner instanceof Aspect) {
+      const
+          ais = this.owner.parent.aspectsInScope,
+          tc = this.owner.parent.to_connector;
+      // NOTE: T-aspects can only be used in other T-expressions.
+      for(let i = 0; i < ais.length; i++) {
+        if(tc === 'T' || ais[i].parent.to_connector !== 'T') {
+          aspects.push(ais[i]);
+        }
+      }
+    } else {
+      aspects = this.owner.relatedAspects(this.connector);
+    }
+    
     // Initialize possible components.
     let obj = null,
         anchor1 = '',
@@ -726,7 +750,7 @@ class ExpressionParser {
           this.expr.charAt(this.pit + this.los) === ' ') {
         this.los++;
       }
-      // ... but trim spaces from the symbol
+      // ... but trim spaces from the symbol.
       v = this.expr.substring(this.pit, this.pit + this.los).trim();
       // Ignore case
       l = v.toLowerCase();
@@ -739,15 +763,33 @@ class ExpressionParser {
           this.error = '# is undefined in this context';
         }
       } else if('0123456789'.indexOf(l.charAt(0)) >= 0) {
-        // If symbol starts with a digit, check whether it is a valid number
-        if(/^\d+((\.|\,)\d*)?(e[\+\-]?\d+)?$/.test(l)) {
+        // If symbol starts with a digit, check whether it is a valid number.
+        if(/^\d+((\.|\,)\d+)?(e[\+\-]?\d+)?$/.test(l)) {
           f = safeStrToFloat(l, l);
+        } else if(/^(\d+d)?(\d+h)?(\d+m)?\d*s?$/.test(l)) {
+          if(this.time_aspect_expression) {
+            // Interpret symbol as time.
+            f = 0;
+            let dt = l.split('d');
+            if(dt.length === 2) f += 24 * parseInt(dt.shift());
+            dt = dt[0].split('h');
+            if(dt.length === 2) f += parseInt(dt.shift());
+            dt = dt[0].split('m');
+            // NOTE: parseInt will ignore a trailing 's'.
+            if(dt.length === 2) f += parseInt(dt[1]) / 3600;
+            // A trailing 's' indicates that last digits denote seconds.
+            f += parseInt(dt[0]) / (l.endsWith('s') ? 3600 : 60);
+            this.relates_to_time = true;
+          } else {
+            f = NaN;
+            this.error = 'Clock times can be used only in Time aspect expressions';
+          }
         } else {
           f = NaN;
         }
         // If not, report error
         if(isNaN(f) || !isFinite(f)) {
-          this.error = `Invalid number "${v}"`;
+          this.error = this.error || `Invalid number "${v}"`;
         } else {
           // If a valid number, keep it within the +/- infinity range
           this.sym = Math.max(VM.MINUS_INFINITY, Math.min(VM.PLUS_INFINITY, f));
@@ -768,9 +810,14 @@ class ExpressionParser {
             // Using time symbols or `random` makes the expression dynamic. 
             if(DYNAMIC_SYMBOLS.indexOf(l) >= 0) this.is_static = false;
             // Time symbols may only be used in Time aspect expressions.
-            if(TIME_ASPECT_CODES.indexOf(this.sym) >= 0 &&
-               !this.time_aspect_expression) this.error =
+            if(TIME_ASPECT_CODES.indexOf(this.sym) >= 0) {
+              if(this.time_aspect_expression) {
+                this.relates_to_time = true;
+              } else {
+                this.error =
                    'Symbol can be used only in Time aspect expressions';
+              }
+            }
           }
         }
       }
@@ -1558,7 +1605,7 @@ function VMI_after(x) {
   // When the AFTER setpoint of expression `x` equals T, the `x` will
   // evaluate as "PENDING" as long as NOW < T, and when the simulated
   // time reaches the set point in time, the setpoint is cleared and
-  // `x` returns evaluates "normally" again (and will execute this AFTER
+  // `x` evaluates "normally" again (and will execute this AFTER
   // instruction again).
   // The Virtual Machine keeps track of setpoints and will advance the
   // simulated time clock after completing cycle to the earliest setpoint.
@@ -1646,42 +1693,6 @@ function VMI_push_infinity(x) {
   x.push(VM.PLUS_INFINITY);
 }
 
-function VMI_push_year(x) {
-  // Push the number of hours in one year.
-  if(DEBUGGING) console.log('push h/yr = 8760');
-  x.push(8760);
-}
-
-function VMI_push_week(x) {
-  // Push the number of hourss in one week.
-  if(DEBUGGING) console.log('push h/wk = 168');
-  x.push(168);
-}
-
-function VMI_push_day(x) {
-  // Push the number of hours in one day.
-  if(DEBUGGING) console.log('push h/d = 24');
-  x.push(24);
-}
-
-function VMI_push_hour(x) {
-  // Push the number of hours in one hour.
-  if(DEBUGGING) console.log('push h/h = 1');
-  x.push(1);
-}
-
-function VMI_push_minute(x) {
-  // Push the number of hours in one minute.
-  if(DEBUGGING) console.log('push h/m = 1/60');
-  x.push(1 / 60);
-}
-
-function VMI_push_second(x) {
-  // Push the number of hours in one second.
-  if(DEBUGGING) console.log('push h/s = 1/3600');
-  x.push(1 / 3600);
-}
-
 function VMI_push_contextual_number(x) {
   // Push the numeric value of the context-sensitive number #.
   const n = valueOfNumberSign(x);
@@ -1763,14 +1774,12 @@ function VMI_push_var(x, args) {
   // beyond the optimization period is evaluated as its last time step
   // UNLESS t is used in a self-referencing variable.
   const xv = obj.hasOwnProperty('xv');
-  if(!xv) {
-    t = Math.max(0, Math.min(
-        MODEL.end_period - MODEL.start_period + MODEL.look_ahead + 1, t));
-  }
+  if(!xv) t = Math.max(0, Math.min(MODEL.run_length, t));
   // Trace only now that time step t has been computed.
   if(DEBUGGING) {
     console.log('push var:', (xv ? '[SELF]' :
-        (obj instanceof Expression ? obj.text : '[' + obj.toString() + ']')),
+        (obj instanceof Expression ? obj.variableName + ' = ' + obj.text :
+            '[' + obj.toString() + ']')),
         tot[1] + ' ' + tot[2]);
   }
   if(obj instanceof Expression) {
@@ -2535,18 +2544,14 @@ const
   SEPARATOR_CHARS = PARENTHESES + OPERATOR_CHARS + "[ '",
   COMPOUND_OPERATORS = ['!=', '<>', '>=', '<='],
   CONSTANT_SYMBOLS = [
-      'c', 'now', 'last',
+      'cycle', 'now', 'last',
       'random', 'true', 'false',
-      'pi', 'infinity', '#',
-      'yr', 'wk', 'd', 'h',
-      'm', 's'],
+      'pi', 'infinity', '#'],
   CONSTANT_CODES = [
       VMI_push_time_step, VMI_push_clock_time, VMI_push_last_activation,
       VMI_push_random, VMI_push_true, VMI_push_false,
-      VMI_push_pi, VMI_push_infinity, VMI_push_contextual_number,
-      VMI_push_year, VMI_push_week, VMI_push_day, VMI_push_hour,
-      VMI_push_minute, VMI_push_second],
-  DYNAMIC_SYMBOLS = ['c', 'now', 'last', 'random', 'after', 'until'],
+      VMI_push_pi, VMI_push_infinity, VMI_push_contextual_number],
+  DYNAMIC_SYMBOLS = ['cycle', 'now', 'last', 'random', 'after', 'until'],
   MONADIC_OPERATORS = [
       '~', 'not', 'abs', 'sin', 'cos', 'atan', 'ln',
       'exp', 'sqrt', 'round', 'int', 'fract', 'min', 'max',
@@ -2570,9 +2575,7 @@ const
   
   // Compiler checks for time aspect codes as they can be used only in
   // Time aspect expressions.
-  TIME_ASPECT_CODES = [VMI_after, VMI_push_clock_time, VMI_push_year,
-      VMI_push_week, VMI_push_day, VMI_push_hour, VMI_push_minute,
-      VMI_push_second, VMI_until],
+  TIME_ASPECT_CODES = [VMI_after, VMI_until],
 
   // Compiler checks for random codes as they make an expression dynamic.
   RANDOM_CODES = [VMI_binomial, VMI_exponential, VMI_normal, VMI_poisson,

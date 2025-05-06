@@ -59,7 +59,7 @@ class FRAMifierModel {
     this.orphan_list = [];
     
     // Model settings.
-    this.arrow_heads = true;
+    this.arrow_heads = false;
     this.grid_pixels = 20;
     this.align_to_grid = true;
     this.run_length = 10;
@@ -80,8 +80,8 @@ class FRAMifierModel {
   }
   
   // NOTE: A model can also be the entity for the documentation manager,
-  // and hence should have the methods `type` and `displayName`.
-  get type() {
+  // and hence should have the methods `FRAMType` and `displayName`.
+  get FRAMType() {
     return 'Model';
   }
 
@@ -393,7 +393,7 @@ class FRAMifierModel {
           addDistinct(obj, link.aspects);
           // NOTE: Aspect may have been restored after deletion, and then
           // have no parent yet.
-          obj.parent = link.from_activity;
+          if(!obj.parent) obj.parent = link.from_activity;
         }
         return obj;
       }
@@ -650,9 +650,13 @@ class FRAMifierModel {
     return [minx, miny];
   }
   
-  eligibleFromToActivities() {
-    // Return a list of activities that are visible in the focal cluster.
-    return this.focal_activity.sub_activities.slice();
+  get activitiesInSelection() {
+    // Returns list with only the selected activities. 
+    const ais = [];
+    for(const obj of this.selection) {
+      if(obj instanceof Activity) addDistinct(obj, ais);
+    }
+    return ais;
   }
 
   get selectionAsXML() {
@@ -890,7 +894,8 @@ class FRAMifierModel {
     // of this UndoEdit
     // NOTE: When aspect is selected, this requires different action.
     if(this.selected_aspect) {
-      this.selected_aspect.removeFromLink(this.selected_aspect_link);
+      this.removeAspectsFromLink([this.selected_aspect],
+          this.selected_aspect_link);
       this.deselectAspect();
       return;
     }
@@ -918,6 +923,12 @@ class FRAMifierModel {
       }
     }
     UI.drawDiagram(this);
+    SUBFUNCTION_VIEWER.updateDialog();
+  }
+  
+  eligibleFromToActivities() {
+    // Return a list of activities that are visible in the focal cluster.
+    return this.focal_activity.sub_activities.slice();
   }
 
   //
@@ -951,18 +962,61 @@ class FRAMifierModel {
     // properly.
     UNDO_STACK.addXML(xml);
   }
+  
+  removeAspectsFromLink(al, l) {
+    // Remove aspects in list `al` from link `l`, and also from the model
+    // if this link is the only one having this aspect.
+    if(!l) return;
+    // Also remove aspect from comprising deep link (if any).
+    const cdl = UI.paper.comprisingDeepLink(l);
+    let xml = '';
+    for(const a of al) {
+      const ai = l.aspects.indexOf(a);
+      if(ai < 0) return;
+      // Remove aspect from list.
+      l.aspects.splice(ai, 1);
+      // NOTE: Aspect can only occur on Output links of the function
+      // that outputs link `l`.
+      const oa = l.from_activity.relatedAspects('O');
+      if(oa.indexOf(a) < 0) {
+        // No more occurrence => remove aspect from model.
+        // NOTE: Add aspect XML at front of UNDO-string.
+        xml = a.asXML + xml;
+        delete this.aspects[a.identifier];
+      }
+      // NOTE: Add link aspect XML at end of UNDO-string.
+      xml += `<link-aspect code="${a.code}" link="${l.identifier}"></link-aspect>`;
+      if(cdl) {
+        const li = cdl.aspects.indexOf(a);
+        if(li) cdl.aspects.splice(li, 1);
+      }
+    }
+    UNDO_STACK.addXML(xml);
+    UI.paper.drawLink(cdl || l);
+    UI.updateButtons();
+    SUBFUNCTION_VIEWER.updateDialog();
+  }
 
   deleteLink(link) {
-    // Remove link from model
+    // Remove link from model.
     // First remove link from outputs list of its FROM node.
-    let i = link.from_activity.connections.O.indexOf(link);
-    if(i >= 0) link.from_activity.connections.O.splice(i, 1);
-    // Also remove link from inputs list of its TO node.
-    for(let c in link.to_activity.connections) if('CRPIT'.indexOf(c) >= 0) {
-      i = link.to_activity.connections[c].indexOf(link);
-      if(i >= 0) link.to_activity.connections[c].splice(i, 1);
+    const
+        fa = link.from_activity,
+        i = fa.connections.O.indexOf(link);
+    if(i >= 0) {
+      fa.connections.O.splice(i, 1);
+      // Explicitly remove aspects from this link so that they will be
+      // removed from the model when they do not figure on any other output
+      // of their parent function.
+      this.removeAspectsFromLink(link.aspects, link);
     }
-    // Finally, remove link from the model
+    // Also remove link from inputs list of its TO node.
+    const tac = link.to_activity.connections;
+    for(const c of 'CRPIT') {
+      const i = tac[c].indexOf(link);
+      if(i >= 0) tac[c].splice(i, 1);
+    }
+    // Finally, remove link from the model.
     UNDO_STACK.addXML(link.asXML);
     delete this.links[link.identifier];
   }
@@ -1031,7 +1085,7 @@ class FRAMifierModel {
   
   get triggerSequence() {
     // Return a lookup of lists of activities, where seq[0] holds all
-    // entry functions, seq[1] the immediate successors of thes entry
+    // entry functions, seq[1] the immediate successors of these entry
     // functions, etc., and seq['NR'] the functions that can *not* be
     // reached from any entry function.
     const
@@ -1166,6 +1220,10 @@ class FRAMifierModel {
         }
       }
     }
+/*
+    // Ensure that aspects have the most "upstream" function as parent.
+    this.attributeAspects();
+*/
     this.focal_activity = this.top_activity;
     // Recompile expressions so that they refer to the correct aspects.
     this.compileExpressions();
@@ -1176,7 +1234,7 @@ class FRAMifierModel {
         '" next-aspect-number="', this.next_aspect_number,
         '" zoom="', this.last_zoom_factor,
         '" run-length="', this.run_length, '"'].join('');
-    if(this.arrow_heads) p += ' arrow_heads="1"';
+    if(this.arrow_heads) p += ' arrow-heads="1"';
     if(this.align_to_grid) p += ' align-to-grid="1"';
     let xml = this.xml_header + ['<model', p, '><name>',  xmlEncoded(this.name),
         '</name><author>', xmlEncoded(this.author),
@@ -1215,7 +1273,70 @@ class FRAMifierModel {
       if(a instanceof Activity) a.setParent(o.parent);
     }
   }
-  
+
+/*
+  // NOTE: This method is NOT used.
+  attributeAspects() {
+    // Ensure that for all aspects the parent is the most "upstream" function
+    // having this aspect as output.
+    const
+        ts = this.triggerSequence,
+        al = [];
+    for(let k in this.aspects) if(this.aspects.hasOwnProperty(k)) {
+      al.push(this.aspects[k]);
+    }
+    for(let i = 0; i < ts.length; i++) {
+      const
+          act = ts[i],
+          oa = act.relatedAspects('O');
+      for(let j = 0; j < oa.length; j++) {
+        const
+            asp = oa[j],
+            ai = al.indexOf(asp);
+        if(ai >= 0) {
+          asp.parent = act;
+          al.splice(ai, 1);
+        }
+      }
+    }
+    // Now all aspects that are output by reachable functions have been
+    // attributed. Of the remaining aspects, those being output by an
+    // unreachable function that does not have this aspect as "incoming"
+    // are attributed to this function.
+    // NOTE: Iterate from last to first because elements may be deleted.
+    for(let i = al.length - 1; i >= 0; i--) {
+      const asp = al[i];
+      for(let j = 0; j < ts.unreachable.length; j++) {
+        const act = ts.unreachable[j];
+        if(act.relatedAspects('O').indexOf(asp) >= 0 &&
+            act.incomingAspects.indexOf(asp) < 0) {
+          asp.parent = act;
+          al.splice(i, 1);
+          break;
+        }
+      }
+    }
+    // Last resort criterion: choose a fuction that does not have the
+    // aspect as input (so only via CRPT).
+    // NOTE: Iterate from last to first because elements may be deleted.
+    for(let i = al.length - 1; i >= 0; i--) {
+      const asp = al[i];
+      for(let j = 0; j < ts.unreachable.length; j++) {
+        const act = ts.unreachable[j];
+        if(act.relatedAspects('O').indexOf(asp) >= 0 &&
+            act.relatedAspects('I').indexOf(asp) < 0) {
+          asp.parent = act;
+          al.splice(i, 1);
+          break;
+        }
+      }
+    }
+    if(al.length) {
+      console.log('WARNING: ' + pluralS(al.length, 'aspect') + ' w/o scope:', al);
+    }
+  }
+*/
+
   initFromFMV(node) {
     // Initialize model from FRAM Model Visualizer XML with `node` as root.
     this.reset();
@@ -1441,6 +1562,10 @@ class Actor {
   get type() {
     return 'Agent';
   }
+  
+  get FRAMType() {
+    return 'Agent';
+  }
 
   get typeLetter() {
     return 'A';
@@ -1552,6 +1677,10 @@ class Note extends ObjectWithXYWH {
   }
 
   get type() {
+    return 'Note';
+  }
+  
+  get FRAMType() {
     return 'Note';
   }
   
@@ -1768,7 +1897,11 @@ class NodeBox extends ObjectWithXYWH {
     // Update actor list in case some actor name is no longer used.
     MODEL.cleanUpActors();
     // NOTE: Renaming may affect the node's display size.
-    if(this.resize()) UI.drawSelection(MODEL);
+    if(this.resize()) {
+      // NOTE: Node ID has changed, so remove shape having old ID.
+      delete UI.paper.shapes[old_id];
+      UI.drawSelection(MODEL);
+    }
     // NOTE: Only TRUE indicates a successful (cosmetic) name change.
     return true;
   }
@@ -1831,8 +1964,12 @@ class Aspect extends NodeBox {
     return 'Aspect';
   }
 
+  get FRAMType() {
+    return 'Aspect';
+  }
+
   get typeLetter() {
-    return 'A';
+    return 'S';
   }
 
   get infoLineName() {
@@ -1856,7 +1993,7 @@ class Aspect extends NodeBox {
       }
       extra += `<code style="color: gray"> &#x225C; ${x.text}</code>`;
     }
-    return `<em>System aspect:</em> ${this.displayName}${extra}`;
+    return `<em>Aspect:</em> ${this.displayName}${extra}`;
   }
   
   value(t) {
@@ -1915,17 +2052,20 @@ class Aspect extends NodeBox {
   removeFromLink(l) {
     // Remove this aspect from its parent link, and also from the model
     // if this link is the only one having this aspect.
-    // @@TO DO: Add undo data!
     if(!l) return;
     const n = l.aspects.indexOf(this);
+    if(n < 0) return;
+    MODEL.removeAspectFrom
     let xml = '';
     // Remove aspect from list.
-    if(n >= 0) {
-      l.aspects.splice(n, 1);
-      xml = `<link-aspect code="${this.code}" link="${l.identifier}"></link-aspect>`;
-    }
-    // NOTE: Aspect can only occur within its parent activity scope.
-    const ais = this.parent.aspectsInScope;
+    l.aspects.splice(n, 1);
+    xml = `<link-aspect code="${this.code}" link="${l.identifier}"></link-aspect>`;
+/*
+    // NOTE: Re-attribute aspects before checking whether this one can be deleted.
+    MODEL.attributeAspects();
+*/
+    // NOTE: Aspect can only occur on its parents Output links.
+    const ais = this.parent.relatedAspects('O');
     if(ais.indexOf(this) < 0) {
       // No more occurrence => remove aspect from model.
       const msg = `Aspect "${this.displayName}" removed from model`;
@@ -1960,12 +2100,11 @@ class Activity extends NodeBox {
     this.predecessors = [];
     // The state of an activity comprises one vector per aspect type.
     this.state = {};
-    for(let i = 0; i < 6; i++) {
-      const c = 'CORPIT'.charAt(i);
+    for(let c of 'CORPIT') {
       this.connections[c] = [];
       this.state[c] = [];
       if(c !== 'O') {
-        this.incoming_expressions[c] = new Expression(this, '');
+        this.incoming_expressions[c] = new Expression(this, '', c);
       }
     }
     // To visualize the time since last activation, the green rim color
@@ -1977,6 +2116,10 @@ class Activity extends NodeBox {
     // NOTE: The standard FRAM terminology does not speak of activities
     // but of functions. Hence in all communication with the modeler,
     // activities appear as "functions".
+    return 'Function';
+  }
+
+  get FRAMType() {
     return 'Function';
   }
 
@@ -2203,18 +2346,26 @@ class Activity extends NodeBox {
     return ais;
   }
   
-  incomingAspects(connector) {
-    // Return list of all aspects for this activity that are incoming
+  relatedAspects(connector) {
+    // Return list of all aspects for this activity that are related
     // via `connector`.
     const
-        ia = [],
+        ra = [],
         cc = this.connections[connector];
     for(let i = 0; i < cc.length; i++) {
       const la = cc[i].aspects;
       for(let j = 0; j < la.length; j++) {
-        addDistinct(la[j], ia);
+        addDistinct(la[j], ra);
       }
     }
+    return ra;
+  }
+  
+  get incomingAspects() {
+    // Return list of all aspects for this activity that are related
+    // via a CRPIT connector (all "incoming" links).
+    const ia = [];
+    for(let c of 'CRPIT') mergeDistinct(this.relatedAspects(c), ia);
     return ia;
   }
   
@@ -2233,10 +2384,9 @@ class Activity extends NodeBox {
   stateChanged(t) {
     // Return TRUE if any of the aspects has changed compared to tick t-1.
     let change = false;
-    for(let i = 0; i < 6; i++) {
+    // NOTE: Start with aspect O for efficiency.
+    for(let k of 'ORPITC') {
       const
-          // NOTE: Start with aspect O for efficiency.
-          k = 'ORPITC'.charAt(i), 
           ps = (t <= 0 ? null : this.state[k][t - 1]),
           cs = this.state[k][t];
       if(cs !== ps) {
@@ -2257,11 +2407,10 @@ class Activity extends NodeBox {
 
   stateChanges(t) {
     // Return changes in aspectscompared to tick t-1 as a string.
-    let changes = [];
-    for(let i = 0; i < 6; i++) {
+    const changes = [];
+    // NOTE: Input first, Output last.
+    for(let k of 'IPTCRO') {
       const
-          // NOTE: Input first, Output last.
-          k = 'IPTCRO'.charAt(i), 
           ps = (t <= 0 ? null : this.state[k][t - 1]),
           cs = this.state[k][t];
       if(cs !== ps) changes.push(
@@ -2440,7 +2589,7 @@ class Activity extends NodeBox {
   }
 
   containsLink(l) {
-    // Returns TRUE iff link `l` is related to some activty in this activity.
+    // Returns TRUE iff link `l` is related to some activity in this activity.
     return this.relatedLinks.indexOf(l) >= 0;
   }
   
@@ -2567,6 +2716,7 @@ class Activity extends NodeBox {
     for(let k in ix) if(ix.hasOwnProperty(k)) {
       s[k][t] = ix[k].result(t);
     }
+    DEBUGGING = true;
     // Review all CRPIT, and apply the default rules if their state still
     // is "not computed" or "undefined".
     for(let k in s) if('CRPIT'.indexOf(k) >= 0) {
@@ -2651,6 +2801,10 @@ class Link {
     return 'Link';
   }
 
+  get FRAMType() {
+    return 'Coupling';
+  }
+
   get typeLetter() {
     return 'L';
   }
@@ -2696,7 +2850,7 @@ class Link {
           if(a) {
             // The FROM node of the link being initialized is the "parent"
             // of its aspects.
-            a.parent = this.from_activity;
+            if(!a.parent) a.parent = this.from_activity;
             // NOTE: Aspects are recorded as model entities, and only
             // *referenced* by links (so the same aspect can appear
             // on multiple links).

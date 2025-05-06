@@ -1080,6 +1080,7 @@ img.inline-cancel-btn {
   width: calc(100% - 24px);
   text-align: center;
   padding: 10px;
+  font-style: italic; 
 }
 
 #subfunction-container {
@@ -1118,8 +1119,8 @@ img.inline-cancel-btn {
 }
 
 #expression-dlg {
-  width: 565px;
-  height: 310px;
+  width: 530px;
+  height: 295px;
 }
 
 #expression-scope {

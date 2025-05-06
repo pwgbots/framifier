@@ -351,7 +351,7 @@ class Paper {
     id = 'a_c_t_i_v_e__l_i_n_k__ID*';
     this.active_link_filter = `filter: url(#${id}); opacity: 1`;
     this.addShadowFilter(defs, id, 'rgb(0,255,0)', 10);
-    if(MODEL && MODEL.draw_arrows) {
+    if(MODEL && MODEL.arrow_heads) {
       id = 'c_h_e_v_r_o_n__t_i_p__ID*';
       this.chevron = `url(#${id})`;
       this.addMarker(defs, id, chev, 8, this.palette.rim);
@@ -609,6 +609,14 @@ class Paper {
   moveShape(obj) {
     const oid = obj.identifier;
     if(this.shapes.hasOwnProperty(oid)) this.shapes[oid].moveTo(obj.x, obj.y);
+  }
+  
+  deleteShape(id) {
+    // Remove shape from SVG and shapes list.
+    if(this.shapes.hasOwnProperty(id)) {
+      this.shapes[id].clear();
+      delete this.shapes[id];
+    }
   }
   
   removeInvisibleSVG() {
@@ -880,7 +888,10 @@ class Paper {
     // Remove shapes of "deep link" objects from the paper.
     for(let k in this.drawn_deep_links) {
       if(this.drawn_deep_links.hasOwnProperty(k)) {
-        this.shapes[drawn_deep_links[k].id].removeFromDOM();
+        const
+            id = this.drawn_deep_links[k].id,
+            shape = this.shapes[id];
+        if(shape) shape.removeFromDOM();
       }
     }
     this.drawn_deep_links = {};
@@ -1027,9 +1038,12 @@ class Paper {
     // Control point for (O) connector follows the straight line to the
     // other connector up to +/- 30 degrees.
     const
+        to_i = tc === 'I',
+        backloop = to_i && dcx < -100,
         fpm60 = Math.abs(dcy) <= Math.abs(dcx) / hsr3 * 0.5,
-        fcpa = (dcx > 0 && fpm60 ? Math.atan(dcy / dcx) :
-            Math.sign(dcy) * pi3 * 0.5),
+        fcpa = (backloop ? (dcy < 0 ? -0.5 : 0.5) * pi3 :
+            (dcx > 0 && fpm60 ? Math.atan(dcy / dcx) :
+                Math.sign(dcy) * pi3 * 0.5)),
         fcpsin = Math.sin(fcpa),
         fcpcos = Math.cos(fcpa); 
     x1 = cx1 + 7 * fcpcos;
@@ -1046,12 +1060,11 @@ class Paper {
         slangle = (dcx > 0 ? Math.PI - slatan :
             (dcy < 0 ? -slatan : 2 * Math.PI - slatan)),
         da = angle - slangle,
-        to_i = tc === 'I',
         part = (to_i && dcx > 0 ? 0.1 : 1),
         tpm60 = Math.abs(da) < pi3 * part,
         rot = ('TC'.indexOf(tc) >= 0 ? -1 :  1),
-        tcpa = (tpm60 ? slangle :
-            angle + (to_i ? Math.sign(dcy) * part : Math.sign(dcx)) * pi3 * rot),
+        tcpa = (backloop ? (dcy < 0 ? 4 : 2) * pi3 : (tpm60 ? slangle :
+            angle + (to_i ? Math.sign(dcy) * part : Math.sign(dcx)) * pi3 * rot)),
         tcpsin = Math.sin(tcpa),
         tcpcos = Math.cos(tcpa),
         ccx2 = ((tc === 'R' && dcx > 0 && dcy > 0) ||
@@ -1059,7 +1072,8 @@ class Paper {
     x2 = cx2 + tcpcos * (7 + this.chevron_space);
     y2 = cy2 + tcpsin * (7 + this.chevron_space);
     tcx = cx2 + tcpcos * (dr + 3 / part) + ccx2;
-    tcy = cy2 + tcpsin * dr + (to_i && dcx < 0 ? dr - Math.sign(dcy) * 50 : 0);
+    tcy = cy2 + tcpsin * dr + (backloop ? (dcy < 0 ? -60 : 60) :
+        (to_i && dcx < 0 ? dr - Math.sign(dcy) * 50 : 0));
     // First draw a thick but near-transparent line so that the mouse
     // events is triggered sooner.
     const
@@ -1137,7 +1151,7 @@ class Paper {
           le.setAttribute('font-style', 'italic');
         }
         // Use bold-face red when aspect is selected by the modeler.
-        if(a === MODEL.selected_aspect) {
+        if(a === MODEL.selected_aspect && l === MODEL.selected_aspect_link) {
           le.setAttribute('fill', UI.color.select);
           le.setAttribute('font-weight', 700);
         }
@@ -1154,12 +1168,15 @@ class Paper {
         // this will permit redrawing this link after selecting and/or
         // editing this aspect.
         if(ndl) le.setAttribute('data-ddlid', l.identifier);
-        // Make aspect text responsive to cursor events...
-        le.setAttribute('pointer-events', 'auto');
-        le.addEventListener('mouseover', sauc);
-        le.addEventListener('mouseout', cauc);
-        // ... and make it show this by changing the cursor.
-        le.setAttribute('cursor', 'pointer');
+        // Make aspect text responsive to cursor events.
+        // NOTE: Only for the main diagram, not the Subfunction viewer.
+        if(this.id === 'main') {
+          le.setAttribute('pointer-events', 'auto');
+          le.addEventListener('mouseover', sauc);
+          le.addEventListener('mouseout', cauc);
+          // Show responsiveness by changing the cursor.
+          le.setAttribute('cursor', 'pointer');
+        }
         if(a.expression.defined &&
             (fa.isActive(MODEL.t - 1) || a.isLasting(MODEL.t))) {
           // When model has been solved, show value of aspect if the

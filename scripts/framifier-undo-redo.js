@@ -435,7 +435,8 @@ class UndoStack {
         // Check for deletion of an aspect.
         if(MODEL.selected_aspect && MODEL.selected_aspect_link) {
           this.undoables.push(re);
-          MODEL.selected_aspect.removeFromLink(MODEL.selected_aspect_link);
+          MODEL.removeAspectsFromLink([MODEL.selected_aspect],
+              MODEL.selected_aspect_link);
         } else {
           // If not an aspect, restore the selection as it was at the
           // time of the "delete" action...

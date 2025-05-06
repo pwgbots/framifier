@@ -131,8 +131,10 @@ class Controller {
     this.OA_SEPARATOR = '|';
     // Use colon with space to separate prefixes and names of clones
     this.PREFIXER = ': ';
-    // FROM->TO represented by solid right-pointing arrow with curved shaft.
-    this.LINK_ARROW = '\u219D';
+    // FROM->TO represented by .
+    this.COUPLING = '\u223C';  // Tilde
+    this.DIRECTED_COUPLING = '\u219D'; // Right-pointing arrow with curved shaft
+    this.LINK_ARROW = this.COUPLING;
     
     // Identify the type of browser in which FRAMifier is running.
     const
@@ -255,9 +257,12 @@ class Controller {
     // Create deep link menu.
     this.deep_link_menu = document.getElementById('deep-link-modal');
     this.deep_link_menu.style.display = 'none';
-    // Menu disappears when cursor moves out.
+    // Menu disappears when cursor moves out...
     this.deep_link_menu.firstElementChild.addEventListener(
         'mouseout', () => this.hideDeepLinkMenu());
+    // ... and when modal overlay is clicked.
+    this.deep_link_menu.addEventListener(
+        'click', () => this.hideDeepLinkMenu());
     
     // Initially, no dialog being dragged or resized.
     this.dr_dialog = null;
@@ -382,17 +387,9 @@ class Controller {
     // These rules are enforced to avoid parsing issues with variable names.
     // NOTE: normalize to also accept letters with accents
     if(name === this.TOP_ACTIVITY_NAME) return true;
+    if(name.endsWith(':') || name.match(/\[\\\|\]/)) return false;
     name = name.normalize('NFKD').trim();
-    if(name.startsWith('$')) {
-      const
-          parts = name.substring(1).split(' '),
-          flow = parts.shift(),
-          aid = this.nameToID(parts.join(' ')),
-          a = MODEL.actorByID(aid);
-      return a && ['IN', 'OUT', 'FLOW'].indexOf(flow) >= 0;
-    }
-    return name && !name.match(/\[\\\|\]/) && !name.endsWith(':') &&
-        (name.startsWith(this.BLACK_BOX) || name[0].match(/[\w]/));
+    return name && name[0].match(/[\w]/);
   }
   
   prefixesAndName(name, key=false) {
@@ -552,7 +549,7 @@ class Controller {
   warningEntityExists(e) {
     // NOTE: `e` can be NULL when an invalid name was specified when renaming
     if(e) {
-      let msg = `${e.type} "${e.displayName}" already exists`;
+      let msg = `${e.FRAMtype} "${e.displayName}" already exists`;
       if(e.displayName === this.TOP_ACTIVITY_NAME) {
         msg = 'System names cannot be used as entity name';
       }
@@ -841,7 +838,7 @@ class Controller {
     }
     this.deep_link_under_cursor = l;
     this.deep_link_info = l.displayName +
-        ` <em>represents ${n} links:</em> ${html.join(', ')}`;
+        ` <em>represents ${n} couplings:</em> ${html.join(', ')}`;
   }
   
   showDeepLinkMenu() {
@@ -855,7 +852,7 @@ class Controller {
         for(let i = 0; i < n; i++) {
           html.push(`<tr class="list"><td onclick="UI.selectDeepLink(${i})">`,
               l.deep_links[i].displayName, '</td><td><img class="sbtn sblue" ',
-              'src="images/delete.png" title="Delete this link" ',
+              'src="images/delete.png" title="Delete this coupling" ',
               `onclick="UI.deleteDeepLink(${i})"></td></tr>`);
         }
         dlt.innerHTML = '<table>' + html.join('') + '</table>';
@@ -897,6 +894,47 @@ class Controller {
     if(e.target.nodeName === 'DIV') this.deep_link_menu.style.display = 'none';    
   }
 
+  showContextualLinkMenu(con, links) {
+    const n = links.length;
+    if(n) {
+      const
+          dlt = this.deep_link_menu.firstElementChild,
+          html = [];
+      for(let i = 0; i < n; i++) {
+        const id = links[i].identifier;
+        html.push(`<tr class="list"><td onclick="UI.selectContextualLink('${id}')">`,
+            links[i].displayName, '</td><td><img class="sbtn sblue" ',
+            'src="images/delete.png" title="Delete this coupling" ',
+            `onclick="UI.deleteContextualLink('${id}')"></td></tr>`);
+      }
+      dlt.innerHTML = '<table>' + html.join('') + '</table>';
+      // Position the pop-up list.
+      const lh = 19 * n;
+      dlt.style.top = Math.max(this.page_y - lh / 2, 45) + 'px';
+      dlt.style.left = (this.page_x - 20) + 'px';
+      dlt.style.height = 'min-content';
+      this.deep_link_menu.style.display = 'block';
+    }
+  }
+  
+  selectContextualLink(id) {
+    this.deep_link_menu.style.display = 'none';
+    const l = MODEL.linkByID(id);
+    if(l) this.showAddAspectDialog(l);
+  }
+  
+  deleteContextualLink(id) {
+    this.deep_link_menu.style.display = 'none';
+    const l = MODEL.linkByID(id);
+    if(l) {
+      MODEL.clearSelection();
+      MODEL.selection.push(l);
+      UNDO_STACK.push('delete');
+      MODEL.deleteSelection();
+      UI.updateButtons();
+    }
+  }
+  
   setAspectUnderCursor(event) {
     // Sets aspect under cursor (if any).
     let t = event.target;
@@ -927,6 +965,11 @@ class Controller {
     const loaded = MODEL.parseXML(xml);
     // If not a valid FRAMifier model, ensure that the current model is clean.
     if(!loaded) MODEL = new FRAMifierModel();
+    if(MODEL.arrow_heads) {
+      this.LINK_ARROW = this.DIRECTED_COUPLING;
+    } else {
+      this.LINK_ARROW = this.COUPLING;
+    }
     this.drawDiagram(MODEL);
     if(FILE_MANAGER.last_file_extension === 'xfmv') {
       // Use the file name as model name.
@@ -984,6 +1027,9 @@ class Controller {
       this.draw_requests = 0;
       this.busy_drawing = true;
       this.paper.drawModel(mdl);
+      if(mdl.focal_activity === SUBFUNCTION_VIEWER.activity) {
+        SUBFUNCTION_VIEWER.updateDialog();
+      }
       this.busy_drawing = false;
     }
   }
@@ -996,6 +1042,9 @@ class Controller {
       this.selection_draw_requests = 0;
       this.busy_drawing_selection = true;
       this.paper.drawSelection(mdl);
+      if(mdl.focal_activity === SUBFUNCTION_VIEWER.activity) {
+        SUBFUNCTION_VIEWER.updateDialog();
+      }
       this.busy_drawing_selection = false;
     }
   }
@@ -1390,9 +1439,17 @@ class Controller {
     con.onmouseover = connectorMouseOver;
     con.onmouseout = connectorMouseOut;
     con.onmousedown = connectorMouseDown;
-    if(asp !== 'O') {
+    if(asp !== 'O' && con.parentElement.id.startsWith('main')) {
       con.addEventListener('click', (event) => {
-          UI.editIncomingExpression(event);
+          if(event.shiftKey) {
+            // When SHIFT is pressed, show invisible connections.
+            const cl = act.contextualLinks;
+            if(cl[asp].length) {
+              UI.showContextualLinkMenu(con, cl[asp]);
+            }
+          } else {
+            UI.editIncomingExpression(event);
+          }
         });
       con.addEventListener('mouseover', () => {
           UI.deep_link_info =
@@ -1408,14 +1465,19 @@ class Controller {
         });
     }
 
-    function connectorMouseOver() {
+    function connectorMouseOver(e) {
+      e = e || window.event;
+      e.preventDefault();
+      e.stopPropagation();
+      const main = con.parentElement.id.startsWith('main');
       // Do not respond when connecting from the same activity, or when
       // trying to connect to an output.
       if(act === UI.from_activity || (UI.from_activity && asp === 'O')) {
         UI.to_connector = null;
         UI.to_activity = null;
         con.style.cursor = 'not-allowed';
-      } else if(UI.from_activity || asp === 'O') {
+      // NOTE: Invite to start connecting only from the main diagram.
+      } else if(UI.from_activity || (main && asp === 'O')) {
         con.style.cursor = 'pointer';
         con.style.stroke = 'Blue';
         con.style.strokeWidth = 2;
@@ -1428,11 +1490,13 @@ class Controller {
         if(act) {
           //DOCUMENTATION_MANAGER.showAspect(a, ca);
         }
-      } else if(act.sub_activities.length) {
-         // Incoming expressions of non-leaf activities cannot be set.
+      } else if(act.sub_activities.length || !main) {
+         // Incoming expressions of non-leaf activities cannot be set,
+         // and connectors in Subfunction viewer should be inert as well.
         con.style.cursor = 'default';
         UI.on_connector = '';
       } else {
+        // Only the main paper permit connections.
         con.style.stroke = UI.color.connecting;
         con.style.strokeWidth = 1.5;
         con.style.cursor = 'pointer';
@@ -1441,7 +1505,7 @@ class Controller {
 
     function connectorMouseOut() {
       // De-highlight connector unless it is the FROM-connector; then
-      // draw the letter in dark blue. The background will be...
+      // draw the letter in dark blue.
       if(con === UI.from_connector) {
         con.nextSibling.style.fill = 'Navy';
       } else {
@@ -1457,6 +1521,9 @@ class Controller {
       }
       UI.to_connector = null;
       UI.to_activity = null;
+      // Clear connection to make unless prompting for FROM and/or TO.
+      const ctm = UI.connection_to_make;
+      if(!(ctm && ctm.prompting)) UI.connection_to_make = null;
       UI.on_connector = '';
       UI.deep_link_info = '';
       con.style.cursor = (asp === 'O' ? 'pointer' : 'default');
@@ -1468,10 +1535,16 @@ class Controller {
       e.stopPropagation();
       // Only permit connecting from an output connector.
       if(act && asp === 'O') {
-        UI.from_connector = con;
-        UI.from_activity = act;
-        document.onmouseup = stopMakeConnection;
-        document.onmousemove = makeConnection;
+        // When SHIFT is pressed, show invisible connections.
+        if(e.shiftKey) {
+          const cl = act.contextualLinks;
+          if(cl[asp].length) UI.showContextualLinkMenu(con, cl[asp]);
+        } else {
+          UI.from_connector = con;
+          UI.from_activity = act;
+          document.onmouseup = stopMakeConnection;
+          document.onmousemove = makeConnection;
+        }
       } else {
         UI.from_connector = null;
         UI.from_activity = null;
@@ -1506,7 +1579,7 @@ class Controller {
     }
   
     function stopMakeConnection(e) {
-      // Stop moving when mouse button is released
+      // Stop moving when mouse button is released.
       e.preventDefault();
       e.stopPropagation();
       document.onmouseup = null;
@@ -1521,6 +1594,7 @@ class Controller {
           fsub: [],
           tsub: [],
           aspect: '',
+          prompting: false,
           subfv: false
         };
       if(ctm.fact) ctm.fsub = ctm.fact.leafActivities;
@@ -1531,48 +1605,55 @@ class Controller {
         ctm.subfv = true;
       }
       UI.connection_to_make = ctm;
-      if(ctm.fsub.length || ctm.tsub.length) {
+      UI.from_activity = null;
+      UI.to_activity = null;
+      UI.clearConnection(UI.from_connector);
+      // Ensure that dragline events are reset.
+      document.onmouseup = null;
+      document.onmousemove = null;
+      // NOTE: When connecting to a function in the Subfunction viewer,
+      // ensure that it is not in the FROM list.
+      const tai = ctm.fsub.indexOf(ctm.tact);
+      if(tai >= 0) ctm.fsub.splice(tai, 1);
+      if(ctm.aspect && (ctm.fsub.length || ctm.tsub.length)) {
         // Prompt modeler to specify which subactivity to link from/to.
         UI.promptForSubActivities();
       } else {
+        UI.paper.hideDragLine();
         // Complete, or abort when no aspect has been set.
         UI.completeConnection();
       }
+    }
+    
+  }
+  
+  clearConnection(c) {
+    if(c) {
+      c.style.stroke = this.color.rim;
+      c.style.strokeWidth = 0.75;
+      c.style.fill = c.dataset.bg;
+      c.nextSibling.style.fill = c.dataset.fg;
+      c.style.cursor = 'default';
     }
   }
 
   completeConnection() {
     // Terminate the connection process.
-    // Always hide dashed dragline arrow.
-    this.paper.hideDragLine();
-    // Ensure that dragline events are reset.
-    document.onmouseup = null;
-    document.onmousemove = null;
     // Always hide the sub-activities list (but it may not be showing).
     this.from_to_modal.style.display = 'none';
     const ctm = this.connection_to_make;
     // De-highlight the connectors (if known).
-    if(ctm.fcon) {
-      ctm.fcon.style.stroke = this.color.rim;
-      ctm.fcon.style.strokeWidth = 0.75;
-      ctm.fcon.style.fill = ctm.fcon.dataset.bg;
-      ctm.fcon.nextSibling.style.fill = ctm.fcon.dataset.fg;
-    }
-    if(ctm.tcon) {
-      ctm.tcon.style.stroke = UI.color.rim;
-      ctm.tcon.style.fill = ctm.tcon.dataset.bg;
-      ctm.tcon.nextSibling.style.fill = ctm.tcon.dataset.fg;
-      ctm.tcon.style.strokeWidth = 0.75;
-    }
+    this.clearConnection(ctm.fcon);
+    this.clearConnection(ctm.tcon);
     // Only add the connection when it is fully specified. If not, the
     // aspect will be empty still, and evaluate as FALSE.
-    if(ctm.aspect) {
+    if(ctm.tcon && ctm.aspect) {
       const l = MODEL.addLink(ctm.fact, ctm.tact, ctm.aspect);
-      if(ctm.fsub.length || ctm.tsub.length) {
+      if(ctm.prompting) {
         // Connection with an invisible sub-activity.
-        // @@@ TO DO: Draw compound link.
-        UI.notify(`Added link: ${l.displayName}`);
-        UI.paper.drawModel(MODEL);
+        this.notify(`Added coupling: ${l.displayName}`);
+        // @@@ TO DO: Draw compound link -- now redraw entire diagram.
+        this.paper.drawModel(MODEL);
       } else {
         // Normal connection between visible activities
         // NOTE: Draw link with both nodes, as they may change from
@@ -1581,10 +1662,11 @@ class Controller {
         this.drawObject(l.to_activity);
         this.drawObject(l);
       }
-      // When connecting to activity in Subfunction viewer, update it.
-      if(ctm.subfv) SUBFUNCTION_VIEWER.updateDialog();
+      // Always update Subfunction viewer, as it may relate to the link.
+      SUBFUNCTION_VIEWER.updateDialog();
     }
     // Terminate the connection process.
+    this.paper.hideDragLine();
     this.connection_to_make = null;
     this.from_connector = null;
     this.from_activity = null;
@@ -1612,46 +1694,45 @@ class Controller {
   promptForSubActivities() {
     // Display list of sub-activities to choose from.
     // If none is selected (mouseout without click), no connection is made.
-    const ctm = this.connection_to_make;
-    if(ctm.aspect) {
-      const
-          le = document.getElementById('sub-activities-list'),
-          fe = document.getElementById('sub-activities-from'),
-          te = document.getElementById('sub-activities-to'),
-          tlbl = document.getElementById('sub-activities-to-lbl'),
-          ftbl = document.getElementById('sub-activities-from-table'),
-          ttbl = document.getElementById('sub-activities-to-table');
-      let max = 0;
-      tlbl.innerText = `To ${circledLetter(ctm.aspect)} of:`;
-      if(ctm.fsub.length) {
-        max = ctm.fsub.length;
-        ftbl.innerHTML = this.subActivityTable(ctm.fsub, 'from');
-        fe.style.display = 'inline-block';
-      } else {
-        fe.style.display = 'none';        
-      }
-      if(ctm.tsub.length) {
-        max = Math.max(max, ctm.tsub.length);
-        ttbl.innerHTML = this.subActivityTable(ctm.tsub, 'to');
-        te.style.display = 'inline-block';
-      } else {
-        te.style.display = 'none';        
-      }
-      // Position the pop-up list.
-      const
-          dx = ctm.tact.width * (ctm.aspect === 'I' ? 1 :
-                  ('PT'.indexOf(ctm.aspect) >= 0 ? 0.75 : 0.25)),
-          dy = ctm.tact.height * ('TC'.indexOf(ctm.aspect) >= 0 ?
-              0 : ('IO'.indexOf(ctm.aspect) >= 0 ? 0.5 : 1)),
-          zf = this.paper.zoom_factor,
-          // List height depends on highest number of leaf activities.
-          lh = 19 * max + 28;
-      le.style.top = Math.max(this.page_y - dy / zf - lh, 45) + 'px';
-      le.style.left = (this.page_x + dx / zf) + 'px';
-      // Display list on top of a near-transparent DIV to prevent
-      // interaction with other screen elements.
-      this.from_to_modal.style.display = 'block';
+    const
+        le = document.getElementById('sub-activities-list'),
+        fe = document.getElementById('sub-activities-from'),
+        te = document.getElementById('sub-activities-to'),
+        tlbl = document.getElementById('sub-activities-to-lbl'),
+        ftbl = document.getElementById('sub-activities-from-table'),
+        ttbl = document.getElementById('sub-activities-to-table'),
+        ctm = this.connection_to_make;
+    ctm.prompting = true;
+    let max = 0;
+    tlbl.innerText = `To ${circledLetter(ctm.aspect)} of:`;
+    if(ctm.fsub.length) {
+      max = ctm.fsub.length;
+      ftbl.innerHTML = this.subActivityTable(ctm.fsub, 'from');
+      fe.style.display = 'inline-block';
+    } else {
+      fe.style.display = 'none';        
     }
+    if(ctm.tsub.length) {
+      max = Math.max(max, ctm.tsub.length);
+      ttbl.innerHTML = this.subActivityTable(ctm.tsub, 'to');
+      te.style.display = 'inline-block';
+    } else {
+      te.style.display = 'none';        
+    }
+    // Position the pop-up list.
+    const
+        dx = ctm.tact.width * (ctm.aspect === 'I' ? 1 :
+                ('PT'.indexOf(ctm.aspect) >= 0 ? 0.75 : 0.25)),
+        dy = ctm.tact.height * ('TC'.indexOf(ctm.aspect) >= 0 ?
+            0 : ('IO'.indexOf(ctm.aspect) >= 0 ? 0.5 : 1)),
+        zf = this.paper.zoom_factor,
+        // List height depends on highest number of leaf activities.
+        lh = 19 * max + 28;
+    le.style.top = Math.max(this.page_y - dy / zf - lh, 45) + 'px';
+    le.style.left = (this.page_x + dx / zf) + 'px';
+    // Display list on top of a near-transparent DIV to prevent
+    // interaction with other screen elements.
+    this.from_to_modal.style.display = 'block';
   }
   
   connectSubActivity(from_to, id) {
@@ -1680,9 +1761,10 @@ class Controller {
         ds = event.target.dataset,
         act = MODEL.activityByID(ds.id),
         asp = ds.aspect;
-    if(act && asp) {
+    if(act && 'CRPIT'.indexOf(asp) >= 0) {
+      // Just in case: create the expression if it does not exits yet.
       if(!act.incoming_expressions[asp]) {
-        act.incoming_expressions[asp] = new Expression(act, '');
+        act.incoming_expressions[asp] = new Expression(act, '', asp);
       }
       X_EDIT.editExpression(act, asp);
     }
@@ -1725,7 +1807,7 @@ class Controller {
       this.focal_activity.style.display = 'none';
     } else {
       this.focal_name.innerHTML = MODEL.focal_activity.displayName;
-      if(MODEL.selection.length > 0) {
+      if(MODEL.activitiesInSelection.length) {
         this.enableButtons('lift');
       } else {
         this.disableButtons('lift');
@@ -2090,7 +2172,6 @@ class Controller {
       this.paper.container.style.cursor = 'pointer';
       // NOTE: Cursor will always be over the selected activity
       // (while dragging).
-      
       // NOTE: do not permit dropping a selection into an activity that
       // has own inputs or outputs. Drop targets must be mere containers
       // for subactivities.
@@ -2105,6 +2186,8 @@ class Controller {
           // NOTE: This means that the target must be set to NULL first.
           this.target_activity = null;
           UI.paper.drawActivity(this.on_activity);
+          // Also update the Subfunction viewer.
+          SUBFUNCTION_VIEWER.updateDialog();
           // Reset the rest as well.
           this.on_activity = null;
           this.on_note = null;
@@ -2122,8 +2205,14 @@ class Controller {
         // Double-clicking opens properties dialog, except for activities;
         // then "drill down", i.e., make the double-clicked activity focal.
         if(this.dragged_node instanceof Activity) {
-          // NOTE: Alt-(double)click indicates "show properties"!
-          if(e.altKey) {
+          // When activity is elementary, show its properties, as this is
+          // a more intuitive action than "drill down", and avoids a
+          // notification.
+          const
+              io = this.dragged_node.countLinksInOut,
+              nc = io.incoming + io.outgoing;
+          // Alt-(double)click also indicates "show properties".
+          if(e.altKey || nc) {
             this.showActivityPropertiesDialog(this.dragged_node);
           } else {
             this.makeFocalActivity(this.dragged_node);
@@ -2343,8 +2432,8 @@ class Controller {
   // 
 
   validNames(nn, an='') {
-    // Check whether names meet conventions; if not, warn user
-    if(!UI.validName(nn) || nn.indexOf(UI.BLACK_BOX) >= 0) {
+    // Check whether names meet conventions; if not, warn user.
+    if(!UI.validName(nn)) {
       UI.warn(`Invalid name "${nn}"`);
       return false;
     }
@@ -3194,10 +3283,15 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     model.author = md.element('author').value.trim();
     // Some changes may necessitate redrawing the diagram.
     let cb = UI.boxChecked('settings-arrow-heads'),
-        redraw = !model.arrow_heads && cb;
+        redraw = model.arrow_heads !== cb;
     model.arrow_heads = cb;
+    if(model.arrow_heads) {
+      this.LINK_ARROW = this.DIRECTED_COUPLING;
+    } else {
+      this.LINK_ARROW = this.COUPLING;
+    }
     cb = UI.boxChecked('settings-align-to-grid');
-    redraw = !model.align_to_grid && cb;
+    redraw = redraw || (!model.align_to_grid && cb);
     model.align_to_grid = cb;
     model.grid_pixels = Math.floor(px);
     model.run_length = Math.max(1, Math.floor(rl));
@@ -3242,9 +3336,9 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     // @@TO DO: prepare for undo
     const
         md = this.modals['add-activity'],
-        act = this.edited_object;
-    // Rename object if name and/or actor have changed
-    let nn = md.element('name').value.trim(),
+        act = this.edited_object,
+        oaid = act.identifier,
+        nn = md.element('name').value.trim(),
         na = md.element('actor').value.trim(),
         nact = act.rename(nn, na);
     // NOTE: When rename returns FALSE, a warning is already shown.
@@ -3252,10 +3346,17 @@ console.log('HERE name conflicts', name_conflicts, mapping);
       this.warningEntityExists(nact);
       return false;
     }
+    // NOTE: Remove the obsolete activity shape.
+    if(oaid !== nact.identifier) UI.paper.deleteShape(oaid);
     // Redraw the shape, as its appearance may have changed.
     UI.paper.drawActivity(act);
     if(act === MODEL.focal_activity) {
       this.focal_name.innerHTML = act.displayName;
+    }
+    // Subfunction viewer may need updating as well.
+    if(SUBFUNCTION_VIEWER.activity === act ||
+        SUBFUNCTION_VIEWER.activity === MODEL.focal_activity) {
+      SUBFUNCTION_VIEWER.updateDialog();
     }
     md.hide();
     this.edited_object = false;
@@ -3293,7 +3394,7 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     const
         md = this.modals['add-aspect'],
         fa = link.from_activity,
-        ais = fa.aspectsInScope,
+        ocl = fa.connections.O,
         list = [],
         ne = md.element('name'),
         le = md.element('list'),
@@ -3302,9 +3403,19 @@ console.log('HERE name conflicts', name_conflicts, mapping);
     fe.innerHTML = fa.displayName;
     fe.title = fa.displayName;
     this.edited_object = link;
-    // Compile list of variables in scope.
-    for(let i = 0; i < ais.length; i++) {
-      list.push(ais[i].displayName);
+    // Do not propose to add existing aspects to T-links.
+    if(link.to_connector !== 'T') {
+      // Compile list of aspects in scope.
+      for(let i = 0; i < ocl.length; i++) {
+        const l = ocl[i];
+        // Do not propose aspects already on link, nor T-aspects.
+        if(link !== l && l.to_connector !== 'T') {
+          for(let j = 0; j < l.aspects.length; j++) {
+            const a = l.aspects[j];
+            if(link.aspects.indexOf(a) < 0) list.push(a.displayName);
+          }
+        }
+      }
     }
     const
         html = [],
@@ -3341,20 +3452,20 @@ console.log('HERE name conflicts', name_conflicts, mapping);
         // NOTE: Explicitly look up the aspect, as we cannot tell from
         // the `addAspect` method result whether this is a *new* aspect.
         oa = MODEL.objectByName(n),
-        // Always add the aspect to the model.
-        a = MODEL.addAspect(n, l);
+        fa = l.from_activity,
+        ais = fa.aspectsInScope;
+    // If aspect already existed, it can only be added when it is
+    // within scope of the FROM activity of the selected link. 
+    if(oa && oa.parent && ais.indexOf(oa) < 0) {
+      this.warn('Aspect <strong>' + oa.displayName +
+        '</strong> is attributed to function <em>' + oa.parent.displayName +
+        '</em> and not within scope of <em>' + fa.displayName + '</em>');
+      return;
+    }
+    // Add the aspect to the model.
+    const a = MODEL.addAspect(n, l);
     // This may already fail (with error message, so just return).
     if(!a) return;
-    if(oa) {
-      // If aspect already existed, it can only be added when it is
-      // within scope of the FROM activity of the selected link. 
-      const aa = l.from_activity.aspectsInScope;
-      if(aa.indexOf(a) < 0) {
-        this.warn('Aspect <strong>' + a.displayName +
-          '</strong> is defined, but out of scope');
-        return;
-      }
-    }
     this.edited_object = null;
     // Select the aspect; this will redraw the link, highlighting the
     // added aspect as selected.

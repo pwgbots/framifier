@@ -289,7 +289,7 @@ class DocumentationManager {
     this.checkEntity();
     if(this.entity) {
       this.title.innerHTML =
-          `<em>${this.entity.type}:</em>&nbsp;${this.entity.displayName}`;
+          `<em>${this.entity.FRAMType}:</em>&nbsp;${this.entity.displayName}`;
     }
   }
 
@@ -297,7 +297,7 @@ class DocumentationManager {
     // Display name of entity under cursor on the infoline, and details
     // in the documentation dialog.
     if(!e) return;
-    let et = e.type,
+    let et = e.FRAMType,
         edn = e.displayName;
     // TO DO: when debugging, display additional data for nodes on the
     // infoline. 
@@ -488,10 +488,10 @@ class DocumentationManager {
           asp = UI.aspect_type[ds.aspect],
           act = MODEL.activities[ds.id],
           ids = ds.lids.split(';'),
-          msg = pluralS(ids.length, `more ${asp} link`) +
+          msg = pluralS(ids.length, `more ${asp} coupling`) +
               ` for function "${act.displayName}"`;
       UI.deep_link_info = msg + (this.visible ? '' :
-          '<span class="extra">(see <img src="images/info.png" ' +
+          '<span class="extra">(Shift-click to modify, see <img src="images/info.png" ' +
               'style="width: 15px; height: 15px; vertical-align: bottom"> ' +
               ' for details)</span>');
       if(this.visible) {
